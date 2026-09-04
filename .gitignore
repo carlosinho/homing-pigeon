@@ -1,0 +1,15 @@
+node_modules/
+dist/
+server/dist/
+.env
+.env.local
+.data/
+credentials.json
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+.DS_Store
