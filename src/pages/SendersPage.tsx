@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Download, Mail, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from '../account-context';
@@ -56,6 +56,8 @@ export function SendersPage() {
     setPage(1);
   };
 
+  const largest = result.rows.reduce((max, sender) => Math.max(max, sender.message_count), 0);
+
   if (!activeAccount && accounts.length === 0) {
     return (
       <>
@@ -73,78 +75,88 @@ export function SendersPage() {
         description="Rank senders by the number of messages in your local inventory."
         action={
           activeAccount ? (
-            <a className="button button-secondary" href={api.sendersCsv(activeAccount.id, params)}>
-              <Download size={16} /> Export CSV
+            <a className="button" href={api.sendersCsv(activeAccount.id, params)}>
+              <Download size={15} /> Export CSV
             </a>
           ) : null
         }
       />
 
-      <section className="sender-layout">
-        <div className="sender-intro-card">
-          <div className="sender-stamp"><Mail size={26} /></div>
-          <p>Each row is one sender address, counted across every message fetched for this Gmail account.</p>
-          <strong>{result.total.toLocaleString()} unique senders</strong>
+      <section>
+        <div className="sender-summary">
+          <strong className="value">{result.total.toLocaleString()} unique senders</strong>
+          <p>Each row is one address, counted across every message fetched for this mailbox. Select a row to see its messages.</p>
         </div>
 
-        <div className="table-card sender-table-card">
-          <div className="table-toolbar">
-            <label className="search-field">
-              <Search size={17} />
-              <input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Find a sender"
-                aria-label="Find a sender"
-              />
-            </label>
-          </div>
-          {error ? <div className="error-banner compact">{error}</div> : null}
-          <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
-            <table className="sender-table">
-              <thead>
-                <tr>
-                  <th>
-                    <button onClick={() => toggleSort('sender_email')}>
-                      Sender
-                      {sortBy === 'sender_email' ? sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} /> : null}
-                    </button>
-                  </th>
-                  <th className="count-column">
-                    <button onClick={() => toggleSort('message_count')}>
-                      Messages
-                      {sortBy === 'message_count' ? sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} /> : null}
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.rows.map((sender, index) => (
-                  <tr
-                    key={sender.sender_email || `unknown-${index}`}
-                    className="clickable-row"
-                    onClick={() => navigate(`/messages?sender_email=${encodeURIComponent(sender.sender_email)}`)}
-                  >
-                    <td>
-                      <span className="sender-rank">{String((page - 1) * result.pageSize + index + 1).padStart(2, '0')}</span>
-                      <strong>{sender.sender_email || 'Unknown sender'}</strong>
-                    </td>
-                    <td className="count-column">
-                      <span className="count-pill">{sender.message_count.toLocaleString()}</span>
-                    </td>
-                  </tr>
-                ))}
-                {!loading && !result.rows.length ? (
-                  <tr><td colSpan={2} className="table-empty">No senders match this search.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} pageSize={result.pageSize} total={result.total} onPage={setPage} />
+        <div className="table-toolbar">
+          <label className="search-field">
+            <Search size={16} />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Find a sender"
+              aria-label="Find a sender"
+            />
+          </label>
         </div>
+        {error ? <div className="error-banner">{error}</div> : null}
+        <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
+          <table className="sender-table">
+            <thead>
+              <tr>
+                <th className="rank-column"><span className="sr-only">Rank</span></th>
+                <th>
+                  <button
+                    className={sortBy === 'sender_email' ? 'sorted' : ''}
+                    onClick={() => toggleSort('sender_email')}
+                  >
+                    Sender
+                    {sortBy === 'sender_email' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
+                  </button>
+                </th>
+                <th className="volume-column"><span className="sr-only">Share of the largest sender on this page</span></th>
+                <th className="count-column">
+                  <button
+                    className={sortBy === 'message_count' ? 'sorted' : ''}
+                    onClick={() => toggleSort('message_count')}
+                  >
+                    Messages
+                    {sortBy === 'message_count' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.rows.map((sender, index) => (
+                <tr
+                  key={sender.sender_email || `unknown-${index}`}
+                  className="clickable-row"
+                  onClick={() => navigate(`/messages?sender_email=${encodeURIComponent(sender.sender_email)}`)}
+                >
+                  <td className="rank-column value">
+                    {String((page - 1) * result.pageSize + index + 1).padStart(2, '0')}
+                  </td>
+                  <td className="sender-cell">{sender.sender_email || 'Unknown sender'}</td>
+                  <td className="volume-column">
+                    <span
+                      className="volume"
+                      style={{ width: `${largest ? (sender.message_count / largest) * 100 : 0}%` }}
+                      aria-hidden="true"
+                    />
+                  </td>
+                  <td className="count-column value">{sender.message_count.toLocaleString()}</td>
+                </tr>
+              ))}
+              {!loading && !result.rows.length ? (
+                <tr><td colSpan={4} className="table-empty">No senders match this search.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={page} pageSize={result.pageSize} total={result.total} onPage={setPage} />
       </section>
     </>
   );

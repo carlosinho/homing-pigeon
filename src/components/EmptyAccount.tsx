@@ -1,4 +1,3 @@
-import { KeyRound } from 'lucide-react';
 import { useAccount } from '../account-context';
 
 export function EmptyAccount() {
@@ -6,9 +5,6 @@ export function EmptyAccount() {
 
   return (
     <div className="empty-panel">
-      <div className="empty-icon">
-        <KeyRound size={22} />
-      </div>
       <h2>Connect Gmail to begin</h2>
       <p>
         Mailroom reads message metadata only and keeps the resulting inventory on

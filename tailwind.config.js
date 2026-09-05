@@ -4,8 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Avenir Next', 'Avenir', 'Segoe UI', 'sans-serif'],
-        mono: ['SFMono-Regular', 'Cascadia Code', 'Consolas', 'monospace'],
+        sans: ['Gorton', 'Routed Gothic', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
     },
   },

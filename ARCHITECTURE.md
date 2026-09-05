@@ -218,6 +218,8 @@ The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<ad
 
 CSV downloads are ordinary links to the export endpoints, so the browser handles streaming and file naming.
 
+Styling is a single hand-written stylesheet, `src/styles.css`, using semantic class names; Tailwind is loaded but only its `sr-only` and a few `min-w-*` utilities are used. The interface uses one typeface family in three widths: Routed Gothic regular, wide, and narrow are registered as `font-stretch` variants of the same family and self-hosted from `public/fonts`, and the stack lists a `Gorton` family first so a licensed Gorton Perfected can replace it by adding `@font-face` rules without other changes. Progress and sender volume share one visual device, a tick-mark scale whose filled width is proportional to the estimate or to the largest count on the current page.
+
 ## API validation and error semantics
 
 - Express accepts JSON request bodies up to 32 KB.

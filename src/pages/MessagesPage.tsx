@@ -93,8 +93,8 @@ export function MessagesPage() {
   };
 
   const sortIcon = (column: Column) => {
-    if (column !== sortBy) return <ArrowUpDown size={13} />;
-    return sortDir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />;
+    if (column !== sortBy) return <ArrowUpDown size={12} />;
+    return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   };
 
   if (!activeAccount && accounts.length === 0) {
@@ -114,17 +114,17 @@ export function MessagesPage() {
         description="Search and inspect the metadata stored on this computer."
         action={
           activeAccount ? (
-            <a className="button button-secondary" href={api.messagesCsv(activeAccount.id, params)}>
-              <Download size={16} /> Export CSV
+            <a className="button" href={api.messagesCsv(activeAccount.id, params)}>
+              <Download size={15} /> Export CSV
             </a>
           ) : null
         }
       />
 
-      <section className="table-card">
+      <section>
         <div className="table-toolbar">
           <label className="search-field">
-            <Search size={17} />
+            <Search size={16} />
             <input
               value={search}
               onChange={(event) => {
@@ -139,12 +139,12 @@ export function MessagesPage() {
             className={`button button-filter ${filtersOpen ? 'active' : ''}`}
             onClick={() => setFiltersOpen((current) => !current)}
           >
-            <SlidersHorizontal size={16} /> Column filters
+            <SlidersHorizontal size={15} /> Column filters
           </button>
-          <span className="result-count">{result.total.toLocaleString()} messages</span>
+          <span className="result-count value">{result.total.toLocaleString()} messages</span>
         </div>
 
-        {error ? <div className="error-banner compact">{error}</div> : null}
+        {error ? <div className="error-banner">{error}</div> : null}
 
         <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
           <table>
@@ -152,7 +152,10 @@ export function MessagesPage() {
               <tr>
                 {columns.map((column) => (
                   <th key={column.key} className={column.width}>
-                    <button onClick={() => sort(column.key)}>
+                    <button
+                      className={column.key === sortBy ? 'sorted' : ''}
+                      onClick={() => sort(column.key)}
+                    >
                       {column.label} {sortIcon(column.key)}
                     </button>
                   </th>
@@ -183,11 +186,11 @@ export function MessagesPage() {
                 <tr key={message.gmail_message_id}>
                   <td className="sender-cell">{message.sender_email || 'Unknown sender'}</td>
                   <td className="subject-cell" title={message.subject}>{message.subject || '(No subject)'}</td>
-                  <td>{new Date(message.received_at).toLocaleString()}</td>
-                  <td className="mono-cell" title={message.rfc_message_id}>{message.rfc_message_id || '—'}</td>
-                  <td className="mono-cell" title={message.gmail_search}>{message.gmail_search || '—'}</td>
-                  <td className="mono-cell">{message.gmail_message_id}</td>
-                  <td className="mono-cell">{message.gmail_thread_id}</td>
+                  <td className="value-cell">{new Date(message.received_at).toLocaleString()}</td>
+                  <td className="value-cell" title={message.rfc_message_id}>{message.rfc_message_id || '—'}</td>
+                  <td className="value-cell" title={message.gmail_search}>{message.gmail_search || '—'}</td>
+                  <td className="value-cell">{message.gmail_message_id}</td>
+                  <td className="value-cell">{message.gmail_thread_id}</td>
                   <td className="sticky-action">
                     <a
                       className="icon-button"
@@ -197,7 +200,7 @@ export function MessagesPage() {
                       aria-label="Open message in Gmail"
                       title="Open in Gmail"
                     >
-                      <ExternalLink size={15} />
+                      <ExternalLink size={14} />
                     </a>
                   </td>
                 </tr>

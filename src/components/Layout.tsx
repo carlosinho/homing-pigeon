@@ -1,24 +1,14 @@
-import {
-  Download,
-  Inbox,
-  MailSearch,
-  Menu,
-  Send,
-  Users,
-  X,
-} from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAccount } from '../account-context';
 
 const navigation = [
-  { to: '/fetch', label: 'Fetch', detail: 'Bring mail in', icon: Download },
-  { to: '/messages', label: 'Messages', detail: 'Inspect the rows', icon: MailSearch },
-  { to: '/senders', label: 'Senders', detail: 'Find the volume', icon: Users },
+  { to: '/fetch', label: 'Fetch' },
+  { to: '/messages', label: 'Messages' },
+  { to: '/senders', label: 'Senders' },
 ];
 
 export function Layout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const {
     accounts,
     activeAccount,
@@ -31,80 +21,43 @@ export function Layout() {
 
   return (
     <div className="app-shell">
-      <button
-        className="mobile-menu-button"
-        aria-label="Open navigation"
-        onClick={() => setMobileOpen(true)}
-      >
-        <Menu size={20} />
-      </button>
-
-      {mobileOpen ? (
-        <button
-          className="mobile-scrim"
-          aria-label="Close navigation"
-          onClick={() => setMobileOpen(false)}
-        />
-      ) : null}
-
-      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
-        <div className="brand-row">
-          <div className="brand-mark">
-            <Send size={19} strokeWidth={2.2} />
-          </div>
-          <div>
-            <span className="brand-name">Mailroom</span>
-            <span className="brand-caption">Gmail inventory</span>
-          </div>
-          <button
-            className="sidebar-close"
-            aria-label="Close navigation"
-            onClick={() => setMobileOpen(false)}
-          >
-            <X size={18} />
-          </button>
-        </div>
+      <header className="topbar">
+        <NavLink to="/fetch" className="brand">
+          Mailroom
+        </NavLink>
 
         <nav className="route-nav" aria-label="Main navigation">
-          <div className="route-line" />
-          {navigation.map(({ to, label, detail, icon: Icon }) => (
+          {navigation.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}
-              onClick={() => setMobileOpen(false)}
               className={({ isActive }) => `route-link ${isActive ? 'active' : ''}`}
             >
-              <span className="route-node">
-                <Icon size={16} />
-              </span>
-              <span>
-                <strong>{label}</strong>
-                <small>{detail}</small>
-              </span>
+              {label}
             </NavLink>
           ))}
         </nav>
 
-        <div className="account-dock">
-          <div className="account-label">
-            <Inbox size={15} /> Mailbox
-          </div>
+        <div className="mailbox">
           {loading ? (
-            <div className="account-loading" />
+            <div className="mailbox-loading" aria-label="Loading mailboxes" />
           ) : accounts.length ? (
-            <select
-              aria-label="Active Gmail account"
-              value={activeAccount?.id || ''}
-              onChange={(event) => selectAccount(Number(event.target.value))}
-            >
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.email}{account.connected ? '' : ' (disconnected)'}
-                </option>
-              ))}
-            </select>
+            <label className="mailbox-select">
+              <span className="sr-only">Active Gmail account</span>
+              <select
+                value={activeAccount?.id || ''}
+                onChange={(event) => selectAccount(Number(event.target.value))}
+              >
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.email}{account.connected ? '' : ' (disconnected)'}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} />
+            </label>
           ) : (
-            <p>No mailbox connected</p>
+            <span className="mailbox-empty">No mailbox connected</span>
           )}
           {configured ? (
             <button className="text-button" onClick={() => void connect()}>
@@ -112,7 +65,7 @@ export function Layout() {
             </button>
           ) : null}
         </div>
-      </aside>
+      </header>
 
       <main className="main-content">
         {error ? <div className="error-banner" role="alert">{error}</div> : null}

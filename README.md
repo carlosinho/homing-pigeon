@@ -24,7 +24,7 @@ The inventory is cumulative for each account. A completed fetch adds new message
 
 ### 1. Connect Gmail
 
-The Fetch screen starts Google OAuth and records the connected Gmail address and tokens locally. More than one account can be connected, and the mailbox selector in the sidebar controls which account the screens use.
+The Fetch screen starts Google OAuth and records the connected Gmail address and tokens locally. More than one account can be connected, and the mailbox selector in the top bar controls which account the screens use.
 
 Disconnecting an account clears its OAuth tokens but deliberately leaves its fetched messages and job history in SQLite. A disconnected account can still be browsed and exported; it must be reconnected before another fetch can run.
 
@@ -66,6 +66,7 @@ CSV output includes a UTF-8 BOM, quotes every value, and prefixes cells beginnin
 
 - React 18, React Router, TypeScript, and Vite
 - Tailwind CSS plus project-specific CSS in `src/styles.css`
+- Routed Gothic, a self-hosted open-licence Gorton typeface, in `public/fonts`
 - Express 5 and TypeScript for the local API
 - `googleapis` for OAuth and Gmail API access
 - SQLite through `better-sqlite3`
@@ -158,7 +159,9 @@ To reset Mailroom completely, stop the backend and remove `.data/`. This removes
 │   ├── components/            # Shared navigation, headers, pagination, and empty state
 │   ├── account-context.tsx    # Account list, active-account selection, and OAuth UI actions
 │   ├── api.ts                 # Typed frontend calls to the local API
-│   └── styles.css             # Tailwind directives and application-specific styling
+│   └── styles.css             # Tailwind directives, font faces, and application-specific styling
+├── public/
+│   └── fonts/                 # Routed Gothic web fonts and their SIL Open Font License
 ├── server/
 │   ├── src/
 │   │   ├── index.ts           # Express routes and static production serving

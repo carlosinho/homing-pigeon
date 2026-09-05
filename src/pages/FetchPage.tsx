@@ -1,12 +1,4 @@
-import {
-  Check,
-  Clock3,
-  Link2,
-  LoaderCircle,
-  Play,
-  RefreshCw,
-  ShieldCheck,
-} from 'lucide-react';
+import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAccount } from '../account-context';
@@ -159,24 +151,19 @@ export function FetchPage() {
       {error ? <div className="error-banner">{error}</div> : null}
       {pollError ? <div className="error-banner" role="alert">{pollError}</div> : null}
 
-      <section className="connection-strip">
-        <div className={`connection-signal ${activeAccount?.connected ? 'connected' : ''}`}>
-          {activeAccount?.connected ? <Check size={16} /> : <Link2 size={16} />}
-        </div>
-        <div>
-          <span className="connection-kicker">Gmail connection</span>
-          <strong>{activeAccount?.email}</strong>
-        </div>
-        <span className={`status-chip ${activeAccount?.connected ? 'success' : 'warning'}`}>
+      <section className="connection-line">
+        <p className="plate">Mailbox</p>
+        <strong>{activeAccount?.email}</strong>
+        <span className={`status ${activeAccount?.connected ? 'connected' : 'disconnected'}`}>
           {activeAccount?.connected ? 'Connected' : 'Disconnected'}
         </span>
         <div className="connection-actions">
           {activeAccount?.connected ? (
-            <button className="text-button muted" onClick={() => void disconnect()}>
+            <button className="text-button" onClick={() => void disconnect()}>
               Disconnect
             </button>
           ) : configured ? (
-            <button className="button button-secondary" onClick={() => void connect()}>
+            <button className="button" onClick={() => void connect()}>
               Reconnect
             </button>
           ) : null}
@@ -184,15 +171,8 @@ export function FetchPage() {
       </section>
 
       <div className="fetch-grid">
-        <section className="card query-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">New route</p>
-              <h2>Choose what to fetch</h2>
-            </div>
-            <ShieldCheck size={20} className="muted-icon" />
-          </div>
-          <label className="field-label" htmlFor="gmail-query">
+        <section>
+          <label className="plate field-label" htmlFor="gmail-query">
             Gmail search query
           </label>
           <textarea
@@ -219,30 +199,40 @@ export function FetchPage() {
             disabled={!query.trim() || submitting || !activeAccount?.connected}
             onClick={() => void startFetch()}
           >
-            {submitting ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <Play size={16} fill="currentColor" />
-            )}
+            {submitting ? <LoaderCircle className="spin" size={16} /> : null}
             Start fetch
           </button>
         </section>
 
-        <section className="card progress-card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Current route</p>
-              <h2>{activeJob ? statusLabel(activeJob.status) : 'Ready'}</h2>
-            </div>
-            {activeJob ? <LoaderCircle className="spin cobalt-icon" size={21} /> : <Check size={21} />}
+        <section aria-live="polite">
+          <div className="current-title">
+            <p className="plate">Current fetch</p>
+            {activeJob ? (
+              <span className={`status ${activeJob.status}`}>{statusLabel(activeJob.status)}</span>
+            ) : null}
           </div>
           {activeJob ? (
             <>
-              <p className="active-query">{activeJob.query}</p>
-              <div className="progress-track" aria-label={`${progress}% complete`}>
+              <p className="current-query value">{activeJob.query}</p>
+              <div
+                className={`meter ${activeJob.status === 'running' ? 'live' : ''}`}
+                role="progressbar"
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
                 <span style={{ width: `${progress}%` }} />
               </div>
-              <div className="progress-stats">
+              <div className="meter-readout value">
+                <span>
+                  <strong>{progress}%</strong> of estimate
+                </span>
+                <span>
+                  {(activeJob.processed_count + activeJob.skipped_count).toLocaleString()} /{' '}
+                  {Math.max(activeJob.total_estimate, activeJob.discovered_count).toLocaleString()}
+                </span>
+              </div>
+              <div className="progress-stats value">
                 <div>
                   <strong>{activeJob.processed_count.toLocaleString()}</strong>
                   <span>added</span>
@@ -258,40 +248,35 @@ export function FetchPage() {
               </div>
             </>
           ) : (
-            <div className="ready-state">
-              <div className="ready-ring"><Clock3 size={23} /></div>
-              <p>No fetch is running.</p>
-              <span>Start one on the left; progress will appear here.</span>
-            </div>
+            <p className="ready-state">
+              No fetch is running.
+              <span>Start one from the query box. Progress appears here and keeps going if you close the tab.</span>
+            </p>
           )}
         </section>
       </div>
 
-      <section className="history-section">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Dispatch log</p>
-            <h2>Recent fetches</h2>
-          </div>
-        </div>
+      <section>
+        <p className="plate">Recent fetches</p>
         <div className="history-list">
           {jobs.length ? (
             jobs.map((job) => (
               <article className="history-row" key={job.id}>
-                <span className={`job-dot ${job.status}`} />
                 <div className="history-query">
-                  <strong>{job.query}</strong>
-                  <span>{new Date(`${job.created_at}Z`).toLocaleString()}</span>
+                  <strong className="value">{job.query}</strong>
+                  <span className="value">{new Date(`${job.created_at}Z`).toLocaleString()}</span>
                 </div>
-                <span className={`status-chip ${job.status}`}>{statusLabel(job.status)}</span>
-                <span className="history-count">
+                <span className={`status ${job.status}`}>{statusLabel(job.status)}</span>
+                <span className="history-count value">
                   {job.processed_count.toLocaleString()} added
                 </span>
                 {job.status === 'failed' ? (
-                  <button className="icon-text-button" onClick={() => void retry(job.id)}>
-                    <RefreshCw size={14} /> Retry
+                  <button className="icon-text-button history-retry" onClick={() => void retry(job.id)}>
+                    <RefreshCw size={13} /> Retry
                   </button>
-                ) : null}
+                ) : (
+                  <span />
+                )}
                 {job.error ? <p className="job-error">{job.error}</p> : null}
               </article>
             ))

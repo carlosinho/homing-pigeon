@@ -16,7 +16,7 @@ export function Pagination({
   const last = Math.min(page * pageSize, total);
 
   return (
-    <div className="pagination">
+    <div className="pagination value">
       <span>
         {first.toLocaleString()}–{last.toLocaleString()} of {total.toLocaleString()}
       </span>
@@ -27,7 +27,7 @@ export function Pagination({
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
-          <ChevronLeft size={17} />
+          <ChevronLeft size={15} />
         </button>
         <span className="page-number">
           {page} / {pages}
@@ -38,7 +38,7 @@ export function Pagination({
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
         >
-          <ChevronRight size={17} />
+          <ChevronRight size={15} />
         </button>
       </div>
     </div>
