@@ -100,7 +100,10 @@ export function MessagesPage() {
   if (!activeAccount && accounts.length === 0) {
     return (
       <>
-        <PageHeader eyebrow="Inventory" title="Messages" description="Search and inspect the metadata fetched from Gmail." />
+        <PageHeader
+          eyebrow=""
+          title="Messages"
+          description="Search and inspect the metadata fetched from Gmail." />
         <EmptyAccount />
       </>
     );
@@ -109,9 +112,9 @@ export function MessagesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Inventory"
+        eyebrow=""
         title="Messages"
-        description="Search and inspect the metadata stored on this computer."
+        description=""
         action={
           activeAccount ? (
             <a className="button" href={api.messagesCsv(activeAccount.id, params)}>

@@ -131,7 +131,7 @@ export function FetchPage() {
     return (
       <>
         <PageHeader
-          eyebrow="Intake"
+          eyebrow=""
           title="Fetch mail"
           description="Run a Gmail search in the background and build a private local inventory."
         />
@@ -143,9 +143,9 @@ export function FetchPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Intake"
-        title="Fetch mail"
-        description="Run a Gmail search in the background. You can close this tab while Mailroom keeps working."
+        eyebrow=""
+        title="Fetch from gmail"
+        description=""
       />
 
       {error ? <div className="error-banner">{error}</div> : null}

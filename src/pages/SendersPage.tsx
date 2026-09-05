@@ -70,9 +70,9 @@ export function SendersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Volume"
+        eyebrow=""
         title="Senders"
-        description="Rank senders by the number of messages in your local inventory."
+        description=""
         action={
           activeAccount ? (
             <a className="button" href={api.sendersCsv(activeAccount.id, params)}>
