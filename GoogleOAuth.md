@@ -51,7 +51,7 @@ https://www.googleapis.com/auth/gmail.readonly
 1. Go to **Google Auth Platform → Clients**.
 2. Click **Create client**.
 3. Set **Application type** to **Web application**.
-4. Enter any name, such as `Mailroom local`.
+4. Enter any name, such as `Homing Pigeon local`.
 5. Leave **Authorized JavaScript origins** empty.
 6. Under **Authorized redirect URIs**, click **Add URI** and enter exactly:
 
@@ -62,7 +62,7 @@ http://localhost:3001/api/auth/google/callback
 7. Click **Create**.
 8. Copy the **Client ID** and **Client secret**.
 
-## 7. Configure Mailroom
+## 7. Configure Homing Pigeon
 
 Create `.env`:
 

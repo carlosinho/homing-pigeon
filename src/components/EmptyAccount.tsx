@@ -7,8 +7,8 @@ export function EmptyAccount() {
     <div className="empty-panel">
       <h2>Connect Gmail to begin</h2>
       <p>
-        Mailroom reads message metadata only and keeps the resulting inventory on
-        this computer.
+        Homing Pigeon reads message metadata only and keeps the resulting inventory
+        on this computer.
       </p>
       {configured ? (
         <button className="button button-primary" onClick={() => void connect()}>

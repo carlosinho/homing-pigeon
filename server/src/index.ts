@@ -339,6 +339,6 @@ if (existsSync(publicDirectory)) {
 }
 
 app.listen(config.port, '127.0.0.1', () => {
-  console.log(`Mailroom is running at http://localhost:${config.port}`);
+  console.log(`Homing Pigeon is running at http://localhost:${config.port}`);
   wakeWorker();
 });

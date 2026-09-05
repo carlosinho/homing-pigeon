@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import homingPigeonLogo from '../assets/homing-pigeon-logo.png';
 import { useAccount } from '../account-context';
 
 const navigation = [
@@ -24,7 +25,13 @@ export function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <NavLink to="/fetch" className="brand">
-          Mailroom
+          <img
+            className="brand-logo"
+            src={homingPigeonLogo}
+            alt=""
+            aria-hidden="true"
+          />
+          <span>Homing Pigeon</span>
         </NavLink>
 
         <nav className="route-nav" aria-label="Main navigation">

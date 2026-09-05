@@ -1,12 +1,12 @@
-# Mailroom architecture
+# Homing Pigeon architecture
 
 This document describes the code that currently runs. Future ideas are isolated at the end and are not architectural claims about the present implementation.
 
 ## System design philosophy
 
-Mailroom is a local, single-process application optimized for a personal proof of concept rather than a hosted service. The React interface is a client of a loopback Express API. Express owns Google OAuth, Gmail API access, SQLite persistence, CSV generation, and an in-process background worker.
+Homing Pigeon is a local, single-process application optimized for a personal proof of concept rather than a hosted service. The React interface is a client of a loopback Express API. Express owns Google OAuth, Gmail API access, SQLite persistence, CSV generation, and an in-process background worker.
 
-The central durability mechanism is idempotence, not precise workflow checkpointing. A Gmail message is stored at most once per account. If work is interrupted, Mailroom restarts the Gmail query and skips rows already present instead of persisting and restoring Gmail page tokens.
+The central durability mechanism is idempotence, not precise workflow checkpointing. A Gmail message is stored at most once per account. If work is interrupted, Homing Pigeon restarts the Gmail query and skips rows already present instead of persisting and restoring Gmail page tokens.
 
 The application intentionally stores a cumulative inventory. Fetch jobs record execution history and progress, but messages are not associated with the jobs that discovered them. This keeps ingestion and analysis simple at the cost of per-fetch result views.
 
@@ -148,7 +148,7 @@ For each job, the worker:
 
 The worker does not persist `nextPageToken`, the set of IDs in a page, or per-message work items. A process interruption therefore loses in-memory pagination progress. Startup recovery queues the job, and account-scoped message uniqueness makes replay safe.
 
-Because existing messages are not refreshed, Mailroom is a first-seen snapshot of those fields. A message deleted from Gmail remains in SQLite. A message that no longer matches a previous query also remains. Running a query again does not update its subject, sender, thread, or date.
+Because existing messages are not refreshed, Homing Pigeon is a first-seen snapshot of those fields. A message deleted from Gmail remains in SQLite. A message that no longer matches a previous query also remains. Running a query again does not update its subject, sender, thread, or date.
 
 ## Job state transitions
 

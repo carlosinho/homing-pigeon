@@ -1,12 +1,12 @@
-# Mailroom
+# Homing Pigeon
 
-Mailroom is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
+Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
 
-Mailroom is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
+Homing Pigeon is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
 
 ## What it does
 
-Mailroom runs the same search syntax as the Gmail search box and stores one row for each matching Gmail message. The stored fields are:
+Homing Pigeon runs the same search syntax as the Gmail search box and stores one row for each matching Gmail message. The stored fields are:
 
 - `sender_email`, extracted from the `From` header and normalized to lowercase
 - `subject`
@@ -151,7 +151,7 @@ The backend creates `.data/mailroom.db`, enables SQLite WAL mode, and stores mes
 
 OAuth tokens are stored as plaintext inside the locally protected database. Do not copy or share it.
 
-To reset Mailroom completely, stop the backend and remove `.data/`. This removes local accounts, tokens, fetch history, and message inventory; it does not change Gmail. The Disconnect button only clears local tokens and does not revoke the grant in the Google account.
+To reset Homing Pigeon completely, stop the backend and remove `.data/`. This removes local accounts, tokens, fetch history, and message inventory; it does not change Gmail. The Disconnect button only clears local tokens and does not revoke the grant in the Google account.
 
 ## Project structure
 
@@ -159,6 +159,7 @@ To reset Mailroom completely, stop the backend and remove `.data/`. This removes
 .
 ├── code.gs                    # Original Apps Script; retained as reference and not used at runtime
 ├── src/
+│   ├── assets/                # Frontend image assets, including the Homing Pigeon logo
 │   ├── pages/                 # Fetch, Messages, Senders, and Domains screens
 │   ├── components/            # Shared navigation, headers, pagination, and empty state
 │   ├── account-context.tsx    # Account list, active-account selection, and OAuth UI actions

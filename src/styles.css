@@ -1,5 +1,5 @@
 /*
-  Mailroom — engraved-panel minimalism.
+  Homing Pigeon — engraved-panel minimalism.
 
   One typeface family in three widths does all the hierarchy work:
   regular for reading, wide for titles and plate labels, narrow for
@@ -175,13 +175,24 @@ select:focus-visible {
 }
 
 .brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
   color: var(--ink);
   font-size: 0.82rem;
   font-stretch: expanded;
   letter-spacing: 0.3em;
+  line-height: 1;
   text-decoration: none;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
 }
 
 .route-nav {
@@ -1102,6 +1113,17 @@ tbody tr:hover td.sticky-action {
     width: 100%;
     gap: 22px;
     margin-top: 12px;
+  }
+
+  .brand {
+    gap: 8px;
+    font-size: 0.74rem;
+    letter-spacing: 0.18em;
+  }
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
   }
 
   .route-link {
