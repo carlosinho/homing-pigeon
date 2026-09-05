@@ -5,7 +5,7 @@ import { useAccount } from '../account-context';
 import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
-import type { FetchJob } from '../types';
+import type { ActivityEvent, FetchJob } from '../types';
 
 const queryExamples = [
   { label: 'Inbox older than a year', value: 'in:inbox older:1y' },
@@ -41,6 +41,7 @@ export function FetchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [jobs, setJobs] = useState<FetchJob[]>([]);
+  const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [pollError, setPollError] = useState('');
@@ -60,6 +61,7 @@ export function FetchPage() {
     setPollError('');
     if (!activeAccount) {
       setJobs([]);
+      setActivities([]);
       return;
     }
 
@@ -70,6 +72,7 @@ export function FetchPage() {
         const result = await api.jobs(activeAccount.id);
         if (!active) return;
         setJobs(result.jobs);
+        setActivities(result.activities);
         setPollError('');
         const unfinished = result.jobs.some(
           (job) => job.status === 'queued' || job.status === 'running',
@@ -102,6 +105,12 @@ export function FetchPage() {
         ),
       )
     : 0;
+  const activity = [
+    ...jobs.map((job) => ({ kind: 'fetch' as const, item: job })),
+    ...activities.map((event) => ({ kind: 'event' as const, item: event })),
+  ]
+    .sort((left, right) => right.item.created_at.localeCompare(left.item.created_at))
+    .slice(0, 12);
 
   const startFetch = async () => {
     if (!activeAccount || !query.trim()) return;
@@ -257,31 +266,51 @@ export function FetchPage() {
       </div>
 
       <section>
-        <p className="plate">Recent fetches</p>
+        <p className="plate">Activity</p>
         <div className="history-list">
-          {jobs.length ? (
-            jobs.map((job) => (
-              <article className="history-row" key={job.id}>
-                <div className="history-query">
-                  <strong className="value">{job.query}</strong>
-                  <span className="value">{new Date(`${job.created_at}Z`).toLocaleString()}</span>
-                </div>
-                <span className={`status ${job.status}`}>{statusLabel(job.status)}</span>
-                <span className="history-count value">
-                  {job.processed_count.toLocaleString()} added
-                </span>
-                {job.status === 'failed' ? (
-                  <button className="icon-text-button history-retry" onClick={() => void retry(job.id)}>
-                    <RefreshCw size={13} /> Retry
-                  </button>
-                ) : (
-                  <span />
-                )}
-                {job.error ? <p className="job-error">{job.error}</p> : null}
-              </article>
-            ))
+          {activity.length ? (
+            activity.map((entry) => {
+              if (entry.kind === 'event') {
+                const event = entry.item;
+                return (
+                  <article className="history-row" key={`event-${event.id}`}>
+                    <div className="history-query">
+                      <strong className="value">Local message inventory erased</strong>
+                      <span className="value">{new Date(`${event.created_at}Z`).toLocaleString()}</span>
+                    </div>
+                    <span className="status completed">Erase</span>
+                    <span className="history-count value">
+                      {event.item_count.toLocaleString()} deleted
+                    </span>
+                    <span />
+                  </article>
+                );
+              }
+
+              const job = entry.item;
+              return (
+                <article className="history-row" key={`fetch-${job.id}`}>
+                  <div className="history-query">
+                    <strong className="value">{job.query}</strong>
+                    <span className="value">{new Date(`${job.created_at}Z`).toLocaleString()}</span>
+                  </div>
+                  <span className={`status ${job.status}`}>{statusLabel(job.status)}</span>
+                  <span className="history-count value">
+                    {job.processed_count.toLocaleString()} added
+                  </span>
+                  {job.status === 'failed' ? (
+                    <button className="icon-text-button history-retry" onClick={() => void retry(job.id)}>
+                      <RefreshCw size={13} /> Retry
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  {job.error ? <p className="job-error">{job.error}</p> : null}
+                </article>
+              );
+            })
           ) : (
-            <div className="inline-empty">Your completed fetches will appear here.</div>
+            <div className="inline-empty">Fetches and local data changes will appear here.</div>
           )}
         </div>
       </section>

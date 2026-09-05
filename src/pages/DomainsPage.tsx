@@ -74,7 +74,7 @@ export function DomainsPage() {
         title="Domains"
         description=""
         action={
-          activeAccount ? (
+          activeAccount && result.total > 0 ? (
             <a className="button" href={api.domainsCsv(activeAccount.id, params)}>
               <Download size={15} /> Export CSV
             </a>

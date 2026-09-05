@@ -310,6 +310,13 @@ select:focus-visible {
   padding-bottom: 6px;
 }
 
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 /* ---------- controls ---------- */
 
 .button {
@@ -349,6 +356,16 @@ select:focus-visible {
 
 .button-primary:hover:not(:disabled) {
   background: #000;
+}
+
+.button-danger {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: var(--live);
+  color: var(--ground);
 }
 
 .button-filter.active {
@@ -719,6 +736,13 @@ textarea:disabled {
 .notice-error {
   margin: 0 0 24px;
   border-left: 2px solid var(--live);
+  padding: 6px 0 6px 16px;
+  font-size: 0.9rem;
+}
+
+.notice-banner {
+  margin: 0 0 24px;
+  border-left: 2px solid var(--ink);
   padding: 6px 0 6px 16px;
   font-size: 0.9rem;
 }
@@ -1106,6 +1130,10 @@ tbody tr:hover td.sticky-action {
 
   .page-action {
     padding: 0;
+  }
+
+  .page-actions {
+    justify-content: flex-start;
   }
 
   .connection-actions {

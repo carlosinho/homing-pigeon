@@ -20,6 +20,8 @@ The app requests message metadata, not message bodies or attachments. Repeating 
 
 The inventory is cumulative for each account. A completed fetch adds new messages to that account's existing inventory; the Messages and Senders screens are not limited to the results of one particular fetch.
 
+The Messages screen can delete all locally stored messages for the selected account. This does not change Gmail, connected accounts, or fetch history. A later fetch can import the same messages again. Successful erases appear alongside fetches in the Fetch screen's Activity list.
+
 ## Main flows
 
 ### 1. Connect Gmail
@@ -191,8 +193,9 @@ The React client uses these endpoints directly. There is no separate API authent
 | `GET` | `/api/auth/google/start` | Create a 10-minute OAuth state value and return Google's authorization URL. |
 | `GET` | `/api/auth/google/callback` | Exchange Google's authorization code, upsert the account by email, and redirect to `/fetch`. |
 | `POST` | `/api/accounts/:accountId/disconnect` | Clear local OAuth tokens while retaining messages and jobs. |
+| `DELETE` | `/api/accounts/:accountId/messages` | Delete all locally stored messages for the account. Returns 409 while the account has a queued or running fetch. |
 | `POST` | `/api/accounts/:accountId/jobs` | Queue a fetch. JSON body: `{ "query": "in:inbox older:1y" }`. Queries must contain 1–1,000 characters after trimming. |
-| `GET` | `/api/accounts/:accountId/jobs` | Return the 12 most recent jobs for the account. |
+| `GET` | `/api/accounts/:accountId/jobs` | Return recent fetch jobs and local-data activity for the account. |
 | `POST` | `/api/jobs/:jobId/retry` | Move a failed job back to `queued`. Returns 409 for a job not currently failed. |
 | `GET` | `/api/accounts/:accountId/messages` | Return a page of account messages. |
 | `GET` | `/api/accounts/:accountId/messages.csv` | Stream all matching account messages as CSV. |

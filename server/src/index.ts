@@ -85,6 +85,41 @@ app.post('/api/accounts/:accountId/disconnect', (request, response) => {
   response.status(204).end();
 });
 
+app.delete('/api/accounts/:accountId/messages', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  if (!getAccount(accountId)) {
+    response.status(404).json({ error: 'Account not found.' });
+    return;
+  }
+
+  const activeJob = db
+    .prepare(
+      `SELECT 1 FROM fetch_jobs
+       WHERE account_id = ? AND status IN ('queued', 'running') LIMIT 1`,
+    )
+    .get(accountId);
+  if (activeJob) {
+    response.status(409).json({
+      error: 'Wait for this mailbox\'s active fetches to finish before deleting its messages.',
+    });
+    return;
+  }
+
+  const deletedCount = db.transaction(() => {
+    const result = db
+      .prepare('DELETE FROM messages WHERE account_id = ?')
+      .run(accountId);
+    if (result.changes) {
+      db.prepare(
+        `INSERT INTO activity_events (account_id, event_type, item_count)
+         VALUES (?, 'messages_deleted', ?)`,
+      ).run(accountId, result.changes);
+    }
+    return result.changes;
+  })();
+  response.json({ deletedCount });
+});
+
 app.post('/api/accounts/:accountId/jobs', (request, response) => {
   const accountId = idSchema.parse(request.params.accountId);
   if (!getAccount(accountId)) {
@@ -112,7 +147,15 @@ app.get('/api/accounts/:accountId/jobs', (request, response) => {
        WHERE account_id = ? ORDER BY id DESC LIMIT 12`,
     )
     .all(accountId);
-  response.json({ jobs });
+  const activities = db
+    .prepare(
+      `SELECT id, account_id, event_type, item_count, created_at
+       FROM activity_events
+       WHERE account_id = ? AND event_type = 'messages_deleted'
+       ORDER BY id DESC LIMIT 12`,
+    )
+    .all(accountId);
+  response.json({ jobs, activities });
 });
 
 app.post('/api/jobs/:jobId/retry', (request, response) => {
@@ -136,6 +179,11 @@ app.post('/api/jobs/:jobId/retry', (request, response) => {
 app.get('/api/accounts/:accountId/messages', (request, response) => {
   const accountId = idSchema.parse(request.params.accountId);
   const query = buildMessageQuery(accountId, request.query);
+  const inventoryTotal = (
+    db
+      .prepare('SELECT COUNT(*) AS count FROM messages WHERE account_id = ?')
+      .get(accountId) as { count: number }
+  ).count;
   const total = (
     db
       .prepare(`SELECT COUNT(*) AS count FROM messages WHERE ${query.whereSql}`)
@@ -152,7 +200,13 @@ app.get('/api/accounts/:accountId/messages', (request, response) => {
       query.pageSize,
       (query.page - 1) * query.pageSize,
     );
-  response.json({ rows, total, page: query.page, pageSize: query.pageSize });
+  response.json({
+    rows,
+    total,
+    inventoryTotal,
+    page: query.page,
+    pageSize: query.pageSize,
+  });
 });
 
 app.get('/api/accounts/:accountId/messages.csv', (request, response) => {

@@ -4,8 +4,10 @@ import {
   ArrowUpDown,
   Download,
   ExternalLink,
+  LoaderCircle,
   Search,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -14,7 +16,7 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
-import type { Message, Page } from '../types';
+import type { Message, MessagePage } from '../types';
 
 const columns = [
   { key: 'sender_email', label: 'Sender', minWidth: '13rem' },
@@ -55,9 +57,18 @@ export function MessagesPage() {
   const [sortBy, setSortBy] = useState<Column>('received_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<Page<Message>>({ rows: [], total: 0, page: 1, pageSize: 25 });
+  const [result, setResult] = useState<MessagePage>({
+    rows: [],
+    total: 0,
+    inventoryTotal: 0,
+    page: 1,
+    pageSize: 25,
+  });
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const params = useMemo(
     () => ({ search, ...filters, sender_domain: senderDomain, sortBy, sortDir, page, pageSize: 25 }),
@@ -86,7 +97,33 @@ export function MessagesPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [activeAccount, params]);
+  }, [activeAccount, params, reloadKey]);
+
+  const deleteMessages = async () => {
+    if (!activeAccount || deleting) return;
+    const confirmed = window.confirm(
+      `Delete all locally stored messages for ${activeAccount.email}?\n\n` +
+        'This includes messages hidden by the current filters. Gmail and fetch history will not be changed. A future fetch can import these messages again.',
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError('');
+    setNotice('');
+    try {
+      const { deletedCount } = await api.deleteMessages(activeAccount.id);
+      setPage(1);
+      setResult({ rows: [], total: 0, inventoryTotal: 0, page: 1, pageSize: 25 });
+      setReloadKey((current) => current + 1);
+      setNotice(
+        `${deletedCount.toLocaleString()} local ${deletedCount === 1 ? 'message' : 'messages'} deleted.`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete local messages.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const sort = (column: Column) => {
     if (column === sortBy) setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
@@ -121,10 +158,24 @@ export function MessagesPage() {
         title="Messages"
         description=""
         action={
-          activeAccount ? (
-            <a className="button" href={api.messagesCsv(activeAccount.id, params)}>
-              <Download size={15} /> Export CSV
-            </a>
+          activeAccount && (result.total > 0 || result.inventoryTotal > 0) ? (
+            <div className="page-actions">
+              {result.total > 0 ? (
+                <a className="button" href={api.messagesCsv(activeAccount.id, params)}>
+                  <Download size={15} /> Export CSV
+                </a>
+              ) : null}
+              {result.inventoryTotal > 0 ? (
+                <button
+                  className="button button-danger"
+                  disabled={deleting}
+                  onClick={() => void deleteMessages()}
+                >
+                  {deleting ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}
+                  {deleting ? 'Deleting' : 'Wipe messages'}
+                </button>
+              ) : null}
+            </div>
           ) : null
         }
       />
@@ -170,7 +221,8 @@ export function MessagesPage() {
           </div>
         ) : null}
 
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div className="error-banner" role="alert">{error}</div> : null}
+        {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
 
         <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
           <table>

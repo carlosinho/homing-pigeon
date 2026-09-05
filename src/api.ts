@@ -1,4 +1,12 @@
-import type { Account, Domain, FetchJob, Message, Page, Sender } from './types';
+import type {
+  Account,
+  ActivityEvent,
+  Domain,
+  FetchJob,
+  MessagePage,
+  Page,
+  Sender,
+} from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -39,8 +47,14 @@ export const api = {
   authorizationUrl: () => request<{ url: string }>('/api/auth/google/start'),
   disconnect: (accountId: number) =>
     request<void>(`/api/accounts/${accountId}/disconnect`, { method: 'POST' }),
+  deleteMessages: (accountId: number) =>
+    request<{ deletedCount: number }>(`/api/accounts/${accountId}/messages`, {
+      method: 'DELETE',
+    }),
   jobs: (accountId: number) =>
-    request<{ jobs: FetchJob[] }>(`/api/accounts/${accountId}/jobs`),
+    request<{ jobs: FetchJob[]; activities: ActivityEvent[] }>(
+      `/api/accounts/${accountId}/jobs`,
+    ),
   createJob: (accountId: number, query: string) =>
     request<FetchJob>(`/api/accounts/${accountId}/jobs`, {
       method: 'POST',
@@ -49,7 +63,7 @@ export const api = {
   retryJob: (jobId: number) =>
     request<FetchJob>(`/api/jobs/${jobId}/retry`, { method: 'POST' }),
   messages: (accountId: number, params: Record<string, string | number | undefined>) =>
-    request<Page<Message>>(
+    request<MessagePage>(
       `/api/accounts/${accountId}/messages?${queryString(params, ['sender_domain'])}`,
     ),
   senders: (accountId: number, params: Record<string, string | number>) =>

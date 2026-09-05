@@ -59,10 +59,20 @@ db.exec(`
     UNIQUE(account_id, gmail_message_id)
   );
 
+  CREATE TABLE IF NOT EXISTS activity_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE INDEX IF NOT EXISTS idx_jobs_account_created
     ON fetch_jobs(account_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_jobs_status
     ON fetch_jobs(status, created_at);
+  CREATE INDEX IF NOT EXISTS idx_activity_account_created
+    ON activity_events(account_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_messages_account_received
     ON messages(account_id, received_at DESC);
   CREATE INDEX IF NOT EXISTS idx_messages_account_sender

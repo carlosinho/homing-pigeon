@@ -74,7 +74,7 @@ export function SendersPage() {
         title="Senders"
         description=""
         action={
-          activeAccount ? (
+          activeAccount && result.total > 0 ? (
             <a className="button" href={api.sendersCsv(activeAccount.id, params)}>
               <Download size={15} /> Export CSV
             </a>

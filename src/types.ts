@@ -21,6 +21,14 @@ export type FetchJob = {
   completed_at: string | null;
 };
 
+export type ActivityEvent = {
+  id: number;
+  account_id: number;
+  event_type: 'messages_deleted';
+  item_count: number;
+  created_at: string;
+};
+
 export type Message = {
   sender_email: string;
   subject: string;
@@ -46,4 +54,8 @@ export type Page<T> = {
   total: number;
   page: number;
   pageSize: number;
+};
+
+export type MessagePage = Page<Message> & {
+  inventoryTotal: number;
 };

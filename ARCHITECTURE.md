@@ -38,6 +38,7 @@ In development, Vite serves the browser application on port 5173 and proxies `/a
 9. The implementation requests Gmail metadata only. It never requests bodies or attachments, although OAuth must use the broader `gmail.readonly` scope to support Gmail's `q` search parameter.
 10. Disconnecting an account removes local tokens but preserves its account row, messages, and fetch jobs.
 11. The active account in the browser is a UI preference stored under `mailroom.activeAccount` in `localStorage`; it is not an authorization boundary.
+12. Deleting an account's local messages preserves its account, OAuth tokens, and fetch jobs. With the message rows gone, a later fetch can import the same Gmail IDs again.
 
 ## Startup sequence
 
@@ -84,7 +85,7 @@ OAuth credentials live on the account row so multiple Gmail accounts can coexist
 | `error` | Human-readable failure or recovery message. Cleared when processing starts. |
 | `created_at`, `started_at`, `completed_at` | SQLite UTC timestamps. `started_at` is overwritten when a job runs again. |
 
-The UI reads only the 12 newest jobs for the active account. Older jobs remain in the database.
+The API reads the 12 newest jobs and 12 newest local-data events for the active account. The UI merges them chronologically and displays the 12 newest activity entries. Older rows remain in the database.
 
 ### `messages`
 
@@ -102,6 +103,10 @@ The UI reads only the 12 newest jobs for the active account. Older jobs remain i
 | `created_at` | Time the local row was first inserted. |
 
 Indexes support recent-job lookup, queued-job lookup, received-date ordering, sender grouping/filtering, and subject filtering. No index exists for RFC ID, Gmail search, or thread ID; Gmail message ID is covered by the composite unique constraint.
+
+### `activity_events`
+
+This table records successful destructive local-data actions without overloading fetch-job semantics. Each row belongs to an account and stores an event type, affected-item count, and creation time. The current event type is `messages_deleted`. These rows are retained when messages are erased and displayed with fetch jobs in the Fetch screen's Activity list.
 
 ## OAuth and account flow
 
@@ -196,6 +201,8 @@ The API is implemented directly in `server/src/index.ts`; there is no controller
 - Pages are one-based. `pageSize` defaults to 25 and is clamped to 10–100.
 
 The list endpoint performs a count query and then an offset-based row query. The CSV endpoint uses the same filters and order but intentionally ignores pagination and iterates every matching row.
+
+`DELETE /api/accounts/:accountId/messages` deletes the complete cumulative inventory for one account, regardless of active UI filters. It returns a conflict while that account has a queued or running fetch so the worker cannot repopulate the inventory during the deletion. The deletion and its activity event are committed in one SQLite transaction. Fetch history and OAuth credentials are preserved.
 
 ### Sender queries
 
