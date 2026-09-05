@@ -17,13 +17,13 @@ import { Pagination } from '../components/Pagination';
 import type { Message, Page } from '../types';
 
 const columns = [
-  { key: 'sender_email', label: 'Sender', width: 'min-w-52' },
-  { key: 'subject', label: 'Subject', width: 'min-w-72' },
-  { key: 'received_at', label: 'Received', width: 'min-w-40' },
-  { key: 'rfc_message_id', label: 'RFC message ID', width: 'min-w-56' },
-  { key: 'gmail_search', label: 'Gmail search', width: 'min-w-52' },
-  { key: 'gmail_message_id', label: 'Gmail message ID', width: 'min-w-48' },
-  { key: 'gmail_thread_id', label: 'Thread ID', width: 'min-w-48' },
+  { key: 'sender_email', label: 'Sender', minWidth: '13rem' },
+  { key: 'subject', label: 'Subject', minWidth: '18rem' },
+  { key: 'received_at', label: 'Received', minWidth: '10rem' },
+  { key: 'rfc_message_id', label: 'RFC message ID', minWidth: '14rem' },
+  { key: 'gmail_search', label: 'Gmail search', minWidth: '13rem' },
+  { key: 'gmail_message_id', label: 'Gmail message ID', minWidth: '12rem' },
+  { key: 'gmail_thread_id', label: 'Thread ID', minWidth: '12rem' },
 ] as const;
 
 type Column = (typeof columns)[number]['key'];
@@ -151,7 +151,7 @@ export function MessagesPage() {
             <thead>
               <tr>
                 {columns.map((column) => (
-                  <th key={column.key} className={column.width}>
+                  <th key={column.key} style={{ minWidth: column.minWidth }}>
                     <button
                       className={column.key === sortBy ? 'sorted' : ''}
                       onClick={() => sort(column.key)}
