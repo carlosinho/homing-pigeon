@@ -212,7 +212,7 @@ React Router defines three routes under a shared `Layout`: `/fetch`, `/messages`
 
 `AccountProvider` is the only shared client state. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
 
-The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. The Messages and Senders screens debounce server reads by 220 milliseconds. Both use server-side count, sorting, filtering, and fixed 25-row pages.
+The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages and Senders screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. Both use server-side count, sorting, filtering, and fixed 25-row pages.
 
 The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. The Messages page reads that query parameter only when its component state is initialized.
 

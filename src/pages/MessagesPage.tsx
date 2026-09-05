@@ -61,18 +61,26 @@ export function MessagesPage() {
 
   useEffect(() => {
     if (!activeAccount) return;
+    let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        setResult(await api.messages(activeAccount.id, params));
+        const result = await api.messages(activeAccount.id, params);
+        if (!active) return;
+        setResult(result);
         setError('');
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Could not load messages.');
+        if (active) {
+          setError(caught instanceof Error ? caught.message : 'Could not load messages.');
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }, 220);
-    return () => window.clearTimeout(timer);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [activeAccount, params]);
 
   const sort = (column: Column) => {

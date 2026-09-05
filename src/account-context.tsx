@@ -74,13 +74,23 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       error,
       selectAccount: setActiveId,
       connect: async () => {
-        const { url } = await api.authorizationUrl();
-        window.location.assign(url);
+        setError('');
+        try {
+          const { url } = await api.authorizationUrl();
+          window.location.assign(url);
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : 'Could not connect Gmail.');
+        }
       },
       disconnect: async () => {
         if (!activeAccount) return;
-        await api.disconnect(activeAccount.id);
-        await refresh();
+        setError('');
+        try {
+          await api.disconnect(activeAccount.id);
+          await refresh();
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : 'Could not disconnect Gmail.');
+        }
       },
       refresh,
     }),

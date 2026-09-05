@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { config } from './config.js';
 import { db, getAccount, type JobRecord } from './database.js';
-import { gmailAuthForAccount } from './google-auth.js';
+import { createOAuthClient } from './google-auth.js';
 import {
   extractEmailAddress,
   getHeader,
@@ -78,7 +78,7 @@ async function processJob(job: JobRecord) {
     throw new Error('This Gmail account is disconnected. Connect it and try again.');
   }
 
-  const auth = gmailAuthForAccount(account);
+  const auth = createOAuthClient(account);
   const gmail = google.gmail({ version: 'v1', auth });
 
   db.prepare(
@@ -88,6 +88,22 @@ async function processJob(job: JobRecord) {
          discovered_count = 0, processed_count = 0, skipped_count = 0
      WHERE id = ?`,
   ).run(job.id);
+
+  const findMessage = db.prepare(
+    'SELECT 1 FROM messages WHERE account_id = ? AND gmail_message_id = ?',
+  );
+  const insertMessage = db.prepare(
+    `INSERT OR IGNORE INTO messages
+     (account_id, sender_email, subject, received_at, rfc_message_id,
+      gmail_search, gmail_message_id, gmail_thread_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const updateDiscovery = db.prepare(
+    'UPDATE fetch_jobs SET total_estimate = ?, discovered_count = ? WHERE id = ?',
+  );
+  const updateProgress = db.prepare(
+    'UPDATE fetch_jobs SET processed_count = ?, skipped_count = ? WHERE id = ?',
+  );
 
   let pageToken: string | undefined;
   let discovered = 0;
@@ -106,18 +122,12 @@ async function processJob(job: JobRecord) {
 
     const messages = page.data.messages || [];
     discovered += messages.length;
-    db.prepare(
-      `UPDATE fetch_jobs SET total_estimate = ?, discovered_count = ? WHERE id = ?`,
-    ).run(page.data.resultSizeEstimate || discovered, discovered, job.id);
+    updateDiscovery.run(page.data.resultSizeEstimate || discovered, discovered, job.id);
 
     for (const item of messages) {
       if (!item.id) continue;
 
-      const exists = db
-        .prepare(
-          'SELECT 1 FROM messages WHERE account_id = ? AND gmail_message_id = ?',
-        )
-        .get(job.account_id, item.id);
+      const exists = findMessage.get(job.account_id, item.id);
 
       if (exists) {
         skipped += 1;
@@ -137,12 +147,7 @@ async function processJob(job: JobRecord) {
         const rfcMessageId = normalizeMessageId(getHeader(headers, 'Message-ID'));
         const receivedAt = Number(response.data.internalDate || Date.now());
 
-        db.prepare(
-          `INSERT OR IGNORE INTO messages
-           (account_id, sender_email, subject, received_at, rfc_message_id,
-            gmail_search, gmail_message_id, gmail_thread_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
+        insertMessage.run(
           job.account_id,
           extractEmailAddress(from),
           subject,
@@ -156,17 +161,11 @@ async function processJob(job: JobRecord) {
       }
 
       if ((processed + skipped) % 10 === 0) {
-        db.prepare(
-          `UPDATE fetch_jobs
-           SET processed_count = ?, skipped_count = ? WHERE id = ?`,
-        ).run(processed, skipped, job.id);
+        updateProgress.run(processed, skipped, job.id);
       }
     }
 
-    db.prepare(
-      `UPDATE fetch_jobs
-       SET processed_count = ?, skipped_count = ? WHERE id = ?`,
-    ).run(processed, skipped, job.id);
+    updateProgress.run(processed, skipped, job.id);
     pageToken = page.data.nextPageToken || undefined;
   } while (pageToken);
 

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { google, type Auth } from 'googleapis';
+import { google } from 'googleapis';
 import { config, googleConfigured } from './config.js';
 import { db, type AccountRecord } from './database.js';
 
@@ -114,8 +114,4 @@ export async function exchangeAuthorizationCode(code: string): Promise<number> {
     );
 
   return Number(result.lastInsertRowid);
-}
-
-export function gmailAuthForAccount(account: AccountRecord): Auth.OAuth2Client {
-  return createOAuthClient(account);
 }

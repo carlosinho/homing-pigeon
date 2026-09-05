@@ -26,6 +26,7 @@ export function Layout() {
     configured,
     connect,
     loading,
+    error,
   } = useAccount();
 
   return (
@@ -114,6 +115,7 @@ export function Layout() {
       </aside>
 
       <main className="main-content">
+        {error ? <div className="error-banner" role="alert">{error}</div> : null}
         <Outlet />
       </main>
     </div>

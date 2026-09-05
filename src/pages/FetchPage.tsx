@@ -7,7 +7,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAccount } from '../account-context';
 import { api } from '../api';
@@ -51,6 +51,7 @@ export function FetchPage() {
   const [jobs, setJobs] = useState<FetchJob[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [pollError, setPollError] = useState('');
 
   useEffect(() => {
     const connected = Number(searchParams.get('connected'));
@@ -64,6 +65,7 @@ export function FetchPage() {
   }, [refresh, searchParams, selectAccount, setSearchParams]);
 
   useEffect(() => {
+    setPollError('');
     if (!activeAccount) {
       setJobs([]);
       return;
@@ -76,13 +78,15 @@ export function FetchPage() {
         const result = await api.jobs(activeAccount.id);
         if (!active) return;
         setJobs(result.jobs);
+        setPollError('');
         const unfinished = result.jobs.some(
           (job) => job.status === 'queued' || job.status === 'running',
         );
         timer = window.setTimeout(load, unfinished ? 1_500 : 5_000);
       } catch (caught) {
         if (active) {
-          setError(caught instanceof Error ? caught.message : 'Could not load fetches.');
+          setPollError(caught instanceof Error ? caught.message : 'Could not load fetches.');
+          timer = window.setTimeout(load, 5_000);
         }
       }
     };
@@ -93,9 +97,8 @@ export function FetchPage() {
     };
   }, [activeAccount]);
 
-  const activeJob = useMemo(
-    () => jobs.find((job) => job.status === 'running' || job.status === 'queued'),
-    [jobs],
+  const activeJob = jobs.find(
+    (job) => job.status === 'running' || job.status === 'queued',
   );
   const progress = activeJob
     ? Math.min(
@@ -154,6 +157,7 @@ export function FetchPage() {
       />
 
       {error ? <div className="error-banner">{error}</div> : null}
+      {pollError ? <div className="error-banner" role="alert">{pollError}</div> : null}
 
       <section className="connection-strip">
         <div className={`connection-signal ${activeAccount?.connected ? 'connected' : ''}`}>

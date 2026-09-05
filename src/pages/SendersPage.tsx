@@ -25,18 +25,26 @@ export function SendersPage() {
 
   useEffect(() => {
     if (!activeAccount) return;
+    let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        setResult(await api.senders(activeAccount.id, params));
+        const result = await api.senders(activeAccount.id, params);
+        if (!active) return;
+        setResult(result);
         setError('');
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Could not load senders.');
+        if (active) {
+          setError(caught instanceof Error ? caught.message : 'Could not load senders.');
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }, 220);
-    return () => window.clearTimeout(timer);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [activeAccount, params]);
 
   const toggleSort = (column: 'sender_email' | 'message_count') => {

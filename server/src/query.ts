@@ -12,16 +12,6 @@ export const messageColumns = [
 
 type MessageColumn = (typeof messageColumns)[number];
 
-const columnExpressions: Record<MessageColumn, string> = {
-  sender_email: 'sender_email',
-  subject: 'subject',
-  received_at: 'received_at',
-  rfc_message_id: 'rfc_message_id',
-  gmail_search: 'gmail_search',
-  gmail_message_id: 'gmail_message_id',
-  gmail_thread_id: 'gmail_thread_id',
-};
-
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -36,7 +26,6 @@ export type MessageQuery = {
   orderSql: string;
   page: number;
   pageSize: number;
-  filters: Record<string, string>;
 };
 
 export function buildMessageQuery(
@@ -45,7 +34,6 @@ export function buildMessageQuery(
 ): MessageQuery {
   const where = ['account_id = ?'];
   const values: Array<string | number> = [accountId];
-  const filters: Record<string, string> = {};
   const search = text(query.search);
 
   if (search) {
@@ -59,11 +47,10 @@ export function buildMessageQuery(
   for (const column of messageColumns) {
     const value = text(query[column]);
     if (!value) continue;
-    filters[column] = value;
     const expression =
       column === 'received_at'
         ? "strftime('%Y-%m-%d %H:%M:%S', received_at / 1000, 'unixepoch')"
-        : columnExpressions[column];
+        : column;
     where.push(`${expression} LIKE ? ESCAPE '\\'`);
     values.push(likeValue(value));
   }
@@ -79,10 +66,28 @@ export function buildMessageQuery(
   return {
     whereSql: where.join(' AND '),
     values,
-    orderSql: `${columnExpressions[sortBy]} ${sortDir}, id DESC`,
+    orderSql: `${sortBy} ${sortDir}, id DESC`,
     page,
     pageSize,
-    filters,
+  };
+}
+
+export function buildSenderQuery(accountId: number, query: ParsedQs) {
+  const search = text(query.search);
+  const whereSql = search ? 'account_id = ? AND sender_email LIKE ?' : 'account_id = ?';
+  const values = search ? [accountId, `%${search}%`] : [accountId];
+  const sortBy = query.sortBy === 'sender_email' ? 'sender_email' : 'message_count';
+  const direction = query.sortDir === 'asc' ? 'ASC' : 'DESC';
+
+  return {
+    whereSql,
+    values,
+    selectSql: `SELECT sender_email, COUNT(*) AS message_count
+                FROM messages WHERE ${whereSql}
+                GROUP BY sender_email
+                ORDER BY ${sortBy} ${direction}, sender_email ASC`,
+    page: Math.max(1, Number(query.page) || 1),
+    pageSize: Math.min(100, Math.max(10, Number(query.pageSize) || 25)),
   };
 }
 
