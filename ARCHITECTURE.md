@@ -1,0 +1,315 @@
+# Mailroom architecture
+
+This document describes the code that currently runs. Future ideas are isolated at the end and are not architectural claims about the present implementation.
+
+## System design philosophy
+
+Mailroom is a local, single-process application optimized for a personal proof of concept rather than a hosted service. The React interface is a client of a loopback Express API. Express owns Google OAuth, Gmail API access, SQLite persistence, CSV generation, and an in-process background worker.
+
+The central durability mechanism is idempotence, not precise workflow checkpointing. A Gmail message is stored at most once per account. If work is interrupted, Mailroom restarts the Gmail query and skips rows already present instead of persisting and restoring Gmail page tokens.
+
+The application intentionally stores a cumulative inventory. Fetch jobs record execution history and progress, but messages are not associated with the jobs that discovered them. This keeps ingestion and analysis simple at the cost of per-fetch result views.
+
+```text
+Browser
+  React Router: /fetch, /messages, /senders
+        │
+        │ same-origin /api calls in a built deployment
+        ▼
+Express on 127.0.0.1
+  ├── OAuth endpoints ─────────────── Google OAuth
+  ├── background worker ───────────── Gmail API
+  ├── query and CSV endpoints
+  └── synchronous better-sqlite3 ─── .data/mailroom.db
+```
+
+In development, Vite serves the browser application on port 5173 and proxies `/api` to Express on port 3001. After `npm run build`, Express serves the generated `dist/` directory in addition to the API.
+
+## Key invariants and rules
+
+1. Every account is identified locally by `accounts.id`; Gmail addresses are unique case-insensitively.
+2. Every stored message belongs to exactly one account through `messages.account_id`.
+3. `(account_id, gmail_message_id)` is unique. Gmail IDs are never treated as globally unique across accounts.
+4. Every fetch job belongs to one account, but there is no relationship between individual jobs and message rows.
+5. Existing message rows are never refreshed during a fetch. A matching Gmail ID increments `skipped_count` and bypasses `messages.get`.
+6. The Messages and Senders APIs always query the cumulative inventory for an account, regardless of which query originally found a message.
+7. Exactly one in-process worker loop may be active. It processes queued jobs serially across all accounts.
+8. Gmail calls inside a job are sequential and share one process-wide minimum request delay.
+9. The implementation requests Gmail metadata only. It never requests bodies or attachments, although OAuth must use the broader `gmail.readonly` scope to support Gmail's `q` search parameter.
+10. Disconnecting an account removes local tokens but preserves its account row, messages, and fetch jobs.
+11. The active account in the browser is a UI preference stored under `mailroom.activeAccount` in `localStorage`; it is not an authorization boundary.
+
+## Startup sequence
+
+Importing `server/src/database.ts` performs database initialization:
+
+1. Create `.data/` relative to `process.cwd()` with requested mode `0700`.
+2. Open `.data/mailroom.db` with `better-sqlite3` and request mode `0600` for the main file.
+3. Enable WAL journal mode and SQLite foreign keys.
+4. Run `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements.
+5. Change every job still marked `running` to `queued` and attach the message `The app stopped before this fetch finished.`.
+6. Start Express on `127.0.0.1` using `PORT`.
+7. Call `wakeWorker()`, which processes any recovered or previously queued jobs.
+
+There is no schema-version table or migration runner. `CREATE TABLE IF NOT EXISTS` creates a fresh database but will not evolve an older table when columns or constraints change.
+
+## Persistence model
+
+### `accounts`
+
+| Column | Meaning |
+| --- | --- |
+| `id` | Local integer primary key used by all account-scoped APIs and foreign keys. |
+| `email` | Gmail address returned by `users.getProfile`; unique with `COLLATE NOCASE`. |
+| `access_token` | Latest Google access token, nullable after disconnect. |
+| `refresh_token` | Google refresh token, nullable when unavailable or disconnected. |
+| `token_expiry` | Google token expiry in epoch milliseconds. |
+| `token_scope` | Scope string returned by Google. |
+| `created_at`, `updated_at` | SQLite UTC timestamps. |
+
+OAuth credentials live on the account row so multiple Gmail accounts can coexist. Reconnecting an existing email updates that row rather than creating a duplicate. When Google refreshes credentials, the OAuth client's `tokens` event updates non-null token fields with `COALESCE`; a refresh response that omits a refresh token therefore does not erase the stored one.
+
+### `fetch_jobs`
+
+| Column | Meaning |
+| --- | --- |
+| `id` | Integer job identifier. |
+| `account_id` | Owning account; foreign key with `ON DELETE CASCADE`. |
+| `query` | Raw Gmail query submitted by the user. |
+| `status` | Application state: `queued`, `running`, `completed`, or `failed`. The database does not enforce an enum constraint. |
+| `total_estimate` | Latest `resultSizeEstimate` from Gmail, or discovered count when Gmail does not provide one. It is an estimate, not an invariant. |
+| `discovered_count` | IDs returned by `messages.list` during the current attempt. |
+| `processed_count` | New rows handled during the current attempt. |
+| `skipped_count` | Matching IDs that already existed during the current attempt. |
+| `error` | Human-readable failure or recovery message. Cleared when processing starts. |
+| `created_at`, `started_at`, `completed_at` | SQLite UTC timestamps. `started_at` is overwritten when a job runs again. |
+
+The UI reads only the 12 newest jobs for the active account. Older jobs remain in the database.
+
+### `messages`
+
+| Column | Meaning |
+| --- | --- |
+| `id` | Local integer primary key used as a deterministic secondary sort key. |
+| `account_id` | Owning account; foreign key with `ON DELETE CASCADE`. |
+| `sender_email` | Lowercased address extracted from `From`, or an empty string when absent. |
+| `subject` | `Subject` header, or an empty string when absent. |
+| `received_at` | Integer epoch milliseconds from Gmail `internalDate`; current wall-clock time is used only if Gmail omits it. |
+| `rfc_message_id` | `Message-ID` with one leading `<` and trailing `>` removed, or an empty string. |
+| `gmail_search` | `rfc822msgid:` plus the normalized RFC ID, or an empty string. |
+| `gmail_message_id` | Gmail's internal message ID. |
+| `gmail_thread_id` | Thread ID from `messages.get`, falling back to `messages.list`, then an empty string. |
+| `created_at` | Time the local row was first inserted. |
+
+Indexes support recent-job lookup, queued-job lookup, received-date ordering, sender grouping/filtering, and subject filtering. No index exists for RFC ID, Gmail search, or thread ID; Gmail message ID is covered by the composite unique constraint.
+
+## OAuth and account flow
+
+1. `GET /api/auth/google/start` verifies that both Google client variables exist.
+2. The server creates 24 random bytes encoded as hex, stores the state value and a ten-minute expiry in a process-local `Map`, and returns a Google authorization URL.
+3. The authorization request uses `access_type=offline`, `prompt=consent select_account`, and the single scope `https://www.googleapis.com/auth/gmail.readonly`.
+4. Google redirects to `GET /api/auth/google/callback`.
+5. The callback consumes the state exactly once. Missing, unknown, expired, or process-lost state redirects to `/fetch?authError=invalid_callback`.
+6. The server exchanges the code for tokens, calls Gmail `users.getProfile`, and uses `emailAddress` to insert or update `accounts`.
+7. The callback redirects to `APP_URL/fetch?connected=<local account id>`.
+8. The React account context reloads account status and persists the active local account ID in `localStorage`.
+
+OAuth state is deliberately in memory. Restarting the backend during the authorization round trip invalidates that attempt; starting Connect again creates a new one.
+
+`POST /api/accounts/:accountId/disconnect` clears the four token fields. It does not call Google's token-revocation endpoint and does not delete local inventory.
+
+## Fetch data flow
+
+### Queueing
+
+`POST /api/accounts/:accountId/jobs` validates `accountId` as a positive integer, verifies that the account row exists, and validates a trimmed query length of 1–1,000 characters. It inserts a `queued` job and calls `wakeWorker()`.
+
+`wakeWorker()` is guarded by the module-level `workerActive` flag. If the worker is already active, the existing loop will pick up queued work. Otherwise it starts a loop that selects the oldest queued job by `created_at`, then `id`.
+
+### Processing
+
+For each job, the worker:
+
+1. Loads the account and fails if both access and refresh tokens are absent.
+2. Marks the job `running`, resets all counters, clears the old error and completion time, and replaces `started_at`.
+3. Calls `users.messages.list` with the raw query, `userId: me`, and `maxResults: 500`.
+4. Adds the returned page length to `discovered_count` and records Gmail's latest result estimate.
+5. Checks each returned Gmail ID against `(account_id, gmail_message_id)`.
+6. For a known ID, increments `skipped_count` without contacting `messages.get`.
+7. For a new ID, calls `users.messages.get` with `format: metadata` and `metadataHeaders: [From, Subject, Message-ID]`, derives the seven stored fields, and inserts with `INSERT OR IGNORE`.
+8. Updates processed and skipped counters every ten handled IDs and at the end of every Gmail list page.
+9. Follows `nextPageToken` until Gmail returns none.
+10. Marks the job `completed` and writes its final counters and completion time.
+
+The worker does not persist `nextPageToken`, the set of IDs in a page, or per-message work items. A process interruption therefore loses in-memory pagination progress. Startup recovery queues the job, and account-scoped message uniqueness makes replay safe.
+
+Because existing messages are not refreshed, Mailroom is a first-seen snapshot of those fields. A message deleted from Gmail remains in SQLite. A message that no longer matches a previous query also remains. Running a query again does not update its subject, sender, thread, or date.
+
+## Job state transitions
+
+```text
+POST job
+   │
+   ▼
+ queued ───────────────► running ───────────────► completed
+   ▲                        │
+   │                        └────────────────────► failed
+   │                                                   │
+   └──────── POST /api/jobs/:jobId/retry ──────────────┘
+
+startup recovery: running ─► queued
+```
+
+Only a `failed` job can be retried through the API. There are no pause, cancel, or delete transitions. A retry reuses the same row and query; it does not create a new job.
+
+## Gmail rate limiting and failure handling
+
+All Gmail operations pass through `gmailRequest()`:
+
+- A process-wide timestamp enforces at least `REQUEST_DELAY_MS` between request starts.
+- The maximum number of attempts is seven, including the initial attempt.
+- Retried errors are HTTP 429, all numeric 5xx responses, and HTTP 403 responses whose error text matches quota or rate-limit terms.
+- Backoff is `min(64 seconds, 2^attempt × 1 second) + up to 1 second of jitter`.
+- A numeric `Retry-After` response header is converted to milliseconds and wins when longer than the calculated backoff.
+- Non-retryable errors and exhausted retries fail the complete job. Rows inserted before failure remain committed.
+
+Authentication errors with status 401 or text matching `invalid_grant` or `unauthorized` are converted to a reconnect instruction. Other errors use Google's message when present. Invalid Gmail query errors are not retried and therefore fail the job.
+
+SQLite operations are synchronous and message inserts are individually committed. There is no transaction spanning a Gmail page or job, which is why successful rows survive later request failures.
+
+## Read and export APIs
+
+The API is implemented directly in `server/src/index.ts`; there is no controller/service abstraction or version prefix beyond `/api`.
+
+### Message queries
+
+`buildMessageQuery()` constructs parameterized SQL scoped by `account_id`:
+
+- `search` matches `sender_email` or `subject`.
+- Each of the seven public columns can be a substring filter.
+- `%`, `_`, and `\` in message filters are escaped and treated literally.
+- `received_at` filtering converts the millisecond value to UTC with SQLite `strftime('%Y-%m-%d %H:%M:%S', ...)` before matching.
+- `sortBy` is selected from a fixed column allowlist; invalid values fall back to `received_at`.
+- Only case-insensitive text `asc` selects ascending order; every other `sortDir` becomes descending.
+- `id DESC` is appended as a stable secondary order.
+- Pages are one-based. `pageSize` defaults to 25 and is clamped to 10–100.
+
+The list endpoint performs a count query and then an offset-based row query. The CSV endpoint uses the same filters and order but intentionally ignores pagination and iterates every matching row.
+
+### Sender queries
+
+Sender endpoints group by the stored `sender_email`; aliases are not merged beyond lowercase normalization. Search is a parameterized `LIKE` against `sender_email`, but unlike message filtering it does not escape `%` or `_`, so those characters act as SQL wildcard patterns.
+
+Sender sorting allows only `sender_email` or `message_count`. Invalid values default to count. The list endpoint uses count plus offset pagination; the CSV endpoint streams the complete filtered grouping.
+
+### CSV encoding
+
+CSV responses are generated by Express without temporary files. They use CRLF line endings, a UTF-8 BOM, quoted cells, doubled embedded quotes, and a leading apostrophe for values beginning with spreadsheet formula characters. Message dates are converted from epoch milliseconds to ISO strings.
+
+## Frontend architecture
+
+React Router defines three routes under a shared `Layout`: `/fetch`, `/messages`, and `/senders`. Unknown routes and `/` redirect to `/fetch`.
+
+`AccountProvider` is the only shared client state. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
+
+The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. The Messages and Senders screens debounce server reads by 220 milliseconds. Both use server-side count, sorting, filtering, and fixed 25-row pages.
+
+The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. The Messages page reads that query parameter only when its component state is initialized.
+
+CSV downloads are ordinary links to the export endpoints, so the browser handles streaming and file naming.
+
+## API validation and error semantics
+
+- Express accepts JSON request bodies up to 32 KB.
+- Zod validates positive integer path IDs and the job-creation body.
+- Zod failures return HTTP 400 with the first issue message.
+- Disconnect returns 404 for an unknown account.
+- Job creation returns 404 for an unknown account.
+- Retrying a job that is not failed returns 409.
+- Unhandled errors are logged and returned as HTTP 500 with their message.
+- Account-scoped read endpoints do not verify that the account exists; an unknown account ID normally produces an empty list or empty CSV.
+- There is no explicit JSON 404 handler. In a built deployment, unmatched GET requests can fall through to the React `index.html` fallback.
+
+## Security model
+
+The primary boundary is the local machine:
+
+- Express binds only to `127.0.0.1`.
+- The app has no user login, session, API key, or per-request authorization layer.
+- Any local process or browser context that can reach the loopback port can call its APIs, start jobs, disconnect accounts, and export stored data.
+- Google client credentials come from `.env`; Gmail tokens and metadata are plaintext in SQLite.
+- The data directory and main database file receive restrictive POSIX modes on a best-effort basis. The parent directory protection also covers SQLite WAL and shared-memory files.
+- OAuth callback state is random, single-use, expires after ten minutes, and is not persisted.
+- SQL values are parameterized. Sort column names are selected from allowlists before interpolation.
+- React performs its normal text escaping for displayed headers and addresses.
+- CSV cells receive formula-prefix protection.
+- `x-powered-by` is disabled.
+
+There is no explicit CSRF layer, origin validation, token encryption, OAuth grant revocation, audit logging, TLS, or secret manager integration. This is acceptable only for the intended loopback deployment. Changing the network binding without adding those controls would violate the current security assumptions.
+
+## Performance decisions and constraints
+
+### Decisions that support the current workload
+
+- Gmail list pages use the maximum 500 IDs.
+- Known messages avoid the expensive metadata request.
+- SQLite WAL permits readers while the worker writes.
+- Message views are paginated and filtered in SQL rather than loading the inventory into React.
+- CSV results are iterated and written to the response instead of accumulated in memory.
+- Indexes cover the default received-date order and the primary sender/subject analysis paths.
+
+### Current scaling boundaries
+
+- The worker is in the API process. Stopping or restarting the web server also stops active Gmail work.
+- One global worker serializes all accounts, and the rate limiter is global rather than per account.
+- Every new message requires an individual `messages.get`; the implementation does not use Gmail batch requests or controlled concurrency.
+- Restarting a large job repeats all `messages.list` pages from the beginning.
+- Offset pagination becomes increasingly expensive at deep page numbers.
+- Substring `LIKE` search cannot use a full-text index and will scan more data as the inventory grows.
+- Sender counts are grouped on demand for both the page and total count.
+- SQLite and plaintext local tokens make the design unsuitable for a horizontally scaled or multi-host deployment.
+- `better-sqlite3` and the Express event loop share one process. Current SQL operations are short, but large scans or exports can delay other requests.
+
+The schema and UI already support multiple Gmail accounts on one local installation. That is different from multi-user hosting: there are no user identities or authorization boundaries between those accounts.
+
+## Edge cases and intentional exceptions
+
+- Empty `From`, `Subject`, `Message-ID`, or thread values are stored as empty strings rather than rejecting the message.
+- Sender parsing prefers text inside angle brackets, otherwise finds the first email-looking substring, otherwise stores the entire `From` value in lowercase. It does not implement the full RFC mailbox grammar or merge aliases.
+- When `internalDate` is unexpectedly absent, ingestion uses `Date.now()`, so that row's received time is an ingestion-time fallback.
+- A message without an RFC Message-ID has an empty `gmail_search`. The UI falls back to a generated Gmail query using subject and sender when opening it.
+- Gmail's `resultSizeEstimate` can differ from the number ultimately discovered, so UI progress is approximate.
+- A job that fails after partial ingestion may show different processed/skipped counts after retry because counters are reset while previously inserted messages become skips.
+- Account disconnect does not interrupt an OAuth client already created for a running job; it only removes tokens from the database. Subsequent token refreshes or new jobs may then fail.
+- The server does not validate that `REQUEST_DELAY_MS` is finite or non-negative. Operational configuration should provide a valid number.
+- Changing `PORT` alone breaks the development proxy and normally the OAuth redirect; the related configuration must move together.
+
+## Testing and maintenance
+
+The automated suite currently contains three parser tests covering a named sender, a bare sender, and removal of RFC Message-ID angle brackets. Run it with:
+
+```bash
+npm test
+```
+
+`npm run build` is also an important verification step because it type-checks the React application, bundles the frontend, and compiles the Node backend.
+
+There are no automated tests for OAuth, Gmail requests, retry timing, worker recovery, SQLite queries, CSV output, Express routes, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
+
+`code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
+
+Dependency versions are recorded in `package-lock.json`. The backend and frontend share one root package rather than separate workspaces.
+
+## Future architecture changes
+
+Possible additions should preserve the account/message uniqueness invariant but may require explicit schema migrations:
+
+- Add a `fetch_job_messages` join table if per-fetch snapshots or query-specific result views are needed.
+- Persist list cursors or per-message work items if restarts must resume near the interruption point instead of replaying a query.
+- Add Gmail History synchronization for incremental refresh and local deletion reconciliation.
+- Move work to a durable external queue before running multiple API replicas.
+- Introduce per-account scheduling and rate limits before parallelizing account fetches.
+- Add FTS or a search service and cursor pagination when offset/`LIKE` performance becomes material.
+- Separate encrypted credentials from analytical data before supporting remote hosting.
+- Add an authenticated user/account ownership model before exposing the API beyond loopback.
+- Add mutation-specific authorization, confirmation, and audit models before any archive, label, trash, delete, or unsubscribe feature.
