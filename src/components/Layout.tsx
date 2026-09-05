@@ -6,6 +6,7 @@ const navigation = [
   { to: '/fetch', label: 'Fetch' },
   { to: '/messages', label: 'Messages' },
   { to: '/senders', label: 'Senders' },
+  { to: '/domains', label: 'Domains' },
 ];
 
 export function Layout() {

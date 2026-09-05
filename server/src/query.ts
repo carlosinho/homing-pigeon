@@ -12,6 +12,9 @@ export const messageColumns = [
 
 type MessageColumn = (typeof messageColumns)[number];
 
+export const senderDomainSql =
+  "CASE WHEN instr(sender_email, '@') > 0 THEN substr(sender_email, instr(sender_email, '@') + 1) ELSE '' END";
+
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -55,6 +58,11 @@ export function buildMessageQuery(
     values.push(likeValue(value));
   }
 
+  if (typeof query.sender_domain === 'string') {
+    where.push(`${senderDomainSql} = ?`);
+    values.push(query.sender_domain.trim().toLowerCase());
+  }
+
   const requestedSort = text(query.sortBy) as MessageColumn;
   const sortBy = messageColumns.includes(requestedSort)
     ? requestedSort
@@ -86,6 +94,27 @@ export function buildSenderQuery(accountId: number, query: ParsedQs) {
                 FROM messages WHERE ${whereSql}
                 GROUP BY sender_email
                 ORDER BY ${sortBy} ${direction}, sender_email ASC`,
+    page: Math.max(1, Number(query.page) || 1),
+    pageSize: Math.min(100, Math.max(10, Number(query.pageSize) || 25)),
+  };
+}
+
+export function buildDomainQuery(accountId: number, query: ParsedQs) {
+  const search = text(query.search);
+  const whereSql = search
+    ? `account_id = ? AND ${senderDomainSql} LIKE ?`
+    : 'account_id = ?';
+  const values = search ? [accountId, `%${search}%`] : [accountId];
+  const sortBy = query.sortBy === 'sender_domain' ? 'sender_domain' : 'message_count';
+  const direction = query.sortDir === 'asc' ? 'ASC' : 'DESC';
+
+  return {
+    whereSql,
+    values,
+    selectSql: `SELECT ${senderDomainSql} AS sender_domain, COUNT(*) AS message_count
+                FROM messages WHERE ${whereSql}
+                GROUP BY sender_domain
+                ORDER BY ${sortBy} ${direction}, sender_domain ASC`,
     page: Math.max(1, Number(query.page) || 1),
     pageSize: Math.min(100, Math.max(10, Number(query.pageSize) || 25)),
   };

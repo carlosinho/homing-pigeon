@@ -1,6 +1,6 @@
 # Mailroom
 
-Mailroom is a local Gmail inventory for answering a practical cleanup question: which senders account for most of the mail in an account? It replaces the original `code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
+Mailroom is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
 
 Mailroom is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
 
@@ -52,13 +52,15 @@ The Messages screen provides server-side pagination, sorting on every stored fie
 
 The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` representation in SQLite, while dates displayed in the browser use the browser's local timezone.
 
-### 4. Rank senders
+### 4. Rank senders and domains
 
 The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the highest message count first. Selecting a sender opens the Messages screen with that sender filter applied.
 
+The Domains screen derives the portion after `@` from each normalized sender email and groups messages by that domain. Sender values without a domain are grouped under Unknown domain. Selecting a domain opens the Messages screen with an exact domain filter applied.
+
 ### 5. Export CSV
 
-Both data screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files contain the seven stored fields, with `received_at` formatted as an ISO timestamp. Sender CSV files contain `sender_email` and `message_count`.
+The Messages, Senders, and Domains screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files contain the seven stored fields, with `received_at` formatted as an ISO timestamp. Sender CSV files contain `sender_email` and `message_count`; domain CSV files contain `sender_domain` and `message_count`.
 
 CSV output includes a UTF-8 BOM, quotes every value, and prefixes cells beginning with `=`, `+`, `-`, or `@` to reduce spreadsheet formula-injection risk.
 
@@ -155,7 +157,7 @@ To reset Mailroom completely, stop the backend and remove `.data/`. This removes
 .
 ├── code.gs                    # Original Apps Script; retained as reference and not used at runtime
 ├── src/
-│   ├── pages/                 # Fetch, Messages, and Senders screens
+│   ├── pages/                 # Fetch, Messages, Senders, and Domains screens
 │   ├── components/            # Shared navigation, headers, pagination, and empty state
 │   ├── account-context.tsx    # Account list, active-account selection, and OAuth UI actions
 │   ├── api.ts                 # Typed frontend calls to the local API
@@ -196,10 +198,13 @@ The React client uses these endpoints directly. There is no separate API authent
 | `GET` | `/api/accounts/:accountId/messages.csv` | Stream all matching account messages as CSV. |
 | `GET` | `/api/accounts/:accountId/senders` | Return grouped sender counts. |
 | `GET` | `/api/accounts/:accountId/senders.csv` | Stream all matching sender counts as CSV. |
+| `GET` | `/api/accounts/:accountId/domains` | Return grouped sender-domain counts. |
+| `GET` | `/api/accounts/:accountId/domains.csv` | Stream all matching sender-domain counts as CSV. |
 
 Message list and CSV parameters:
 
 - `search`: substring search across `sender_email` and `subject`
+- `sender_domain`: exact derived sender-domain filter, including an empty value for messages without a domain
 - any stored field name: per-column substring filter
 - `sortBy`: one of the seven stored field names; defaults to `received_at`
 - `sortDir`: `asc` or `desc`; any value other than `asc` becomes descending
@@ -210,6 +215,13 @@ Sender list and CSV parameters:
 
 - `search`: sender-email substring search
 - `sortBy`: `sender_email` or `message_count`; defaults to `message_count`
+- `sortDir`: `asc` or `desc`
+- `page` and `pageSize`: list endpoint only, with the same bounds as messages
+
+Domain list and CSV parameters:
+
+- `search`: sender-domain substring search
+- `sortBy`: `sender_domain` or `message_count`; defaults to `message_count`
 - `sortDir`: `asc` or `desc`
 - `page` and `pageSize`: list endpoint only, with the same bounds as messages
 

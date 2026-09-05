@@ -795,6 +795,28 @@ textarea:disabled {
   white-space: nowrap;
 }
 
+.active-domain-filter {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: -4px 0 20px;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+
+.active-domain-filter button {
+  border: 0;
+  color: var(--ink-2);
+  background: transparent;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.active-domain-filter button:hover {
+  color: var(--ink);
+}
+
 .table-scroll {
   overflow: auto;
   max-width: 100%;
@@ -959,7 +981,7 @@ tbody tr:hover td.sticky-action {
   text-align: center;
 }
 
-/* ---------- senders ---------- */
+/* ---------- senders and domains ---------- */
 
 .sender-summary {
   display: flex;

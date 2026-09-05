@@ -1,4 +1,4 @@
-import type { Account, FetchJob, Message, Page, Sender } from './types';
+import type { Account, Domain, FetchJob, Message, Page, Sender } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -20,10 +20,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function queryString(values: Record<string, string | number | undefined>) {
+export function queryString(
+  values: Record<string, string | number | undefined>,
+  includeEmpty: string[] = [],
+) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined && value !== '') params.set(key, String(value));
+    if (value !== undefined && (value !== '' || includeEmpty.includes(key))) {
+      params.set(key, String(value));
+    }
   }
   return params.toString();
 }
@@ -43,16 +48,22 @@ export const api = {
     }),
   retryJob: (jobId: number) =>
     request<FetchJob>(`/api/jobs/${jobId}/retry`, { method: 'POST' }),
-  messages: (accountId: number, params: Record<string, string | number>) =>
+  messages: (accountId: number, params: Record<string, string | number | undefined>) =>
     request<Page<Message>>(
-      `/api/accounts/${accountId}/messages?${queryString(params)}`,
+      `/api/accounts/${accountId}/messages?${queryString(params, ['sender_domain'])}`,
     ),
   senders: (accountId: number, params: Record<string, string | number>) =>
     request<Page<Sender>>(
       `/api/accounts/${accountId}/senders?${queryString(params)}`,
     ),
-  messagesCsv: (accountId: number, params: Record<string, string | number>) =>
-    `/api/accounts/${accountId}/messages.csv?${queryString(params)}`,
+  domains: (accountId: number, params: Record<string, string | number>) =>
+    request<Page<Domain>>(
+      `/api/accounts/${accountId}/domains?${queryString(params)}`,
+    ),
+  messagesCsv: (accountId: number, params: Record<string, string | number | undefined>) =>
+    `/api/accounts/${accountId}/messages.csv?${queryString(params, ['sender_domain'])}`,
   sendersCsv: (accountId: number, params: Record<string, string | number>) =>
     `/api/accounts/${accountId}/senders.csv?${queryString(params)}`,
+  domainsCsv: (accountId: number, params: Record<string, string | number>) =>
+    `/api/accounts/${accountId}/domains.csv?${queryString(params)}`,
 };

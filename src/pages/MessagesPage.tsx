@@ -35,7 +35,12 @@ function gmailLink(email: string, message: Message) {
 
 export function MessagesPage() {
   const { activeAccount, accounts } = useAccount();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [senderDomain, setSenderDomain] = useState<string | undefined>(() =>
+    searchParams.has('sender_domain')
+      ? searchParams.get('sender_domain') || ''
+      : undefined,
+  );
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Record<Column, string>>(() => ({
     sender_email: searchParams.get('sender_email') || '',
@@ -55,8 +60,8 @@ export function MessagesPage() {
   const [error, setError] = useState('');
 
   const params = useMemo(
-    () => ({ search, ...filters, sortBy, sortDir, page, pageSize: 25 }),
-    [filters, page, search, sortBy, sortDir],
+    () => ({ search, ...filters, sender_domain: senderDomain, sortBy, sortDir, page, pageSize: 25 }),
+    [filters, page, search, senderDomain, sortBy, sortDir],
   );
 
   useEffect(() => {
@@ -146,6 +151,24 @@ export function MessagesPage() {
           </button>
           <span className="result-count value">{result.total.toLocaleString()} messages</span>
         </div>
+
+        {senderDomain !== undefined ? (
+          <div className="active-domain-filter">
+            Domain: <strong>{senderDomain || 'Unknown domain'}</strong>
+            <button
+              type="button"
+              onClick={() => {
+                setSenderDomain(undefined);
+                setPage(1);
+                const next = new URLSearchParams(searchParams);
+                next.delete('sender_domain');
+                setSearchParams(next, { replace: true });
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        ) : null}
 
         {error ? <div className="error-banner">{error}</div> : null}
 

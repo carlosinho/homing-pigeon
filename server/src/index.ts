@@ -11,10 +11,12 @@ import {
   exchangeAuthorizationCode,
 } from './google-auth.js';
 import {
+  buildDomainQuery,
   buildMessageQuery,
   buildSenderQuery,
   csvCell,
   messageColumns,
+  senderDomainSql,
 } from './query.js';
 import { wakeWorker } from './worker.js';
 
@@ -216,6 +218,46 @@ app.get('/api/accounts/:accountId/senders.csv', (request, response) => {
   for (const row of rows) {
     response.write(
       `${csvCell(row.sender_email)},${csvCell(row.message_count)}\r\n`,
+    );
+  }
+  response.end();
+});
+
+app.get('/api/accounts/:accountId/domains', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const query = buildDomainQuery(accountId, request.query);
+  const total = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM (
+           SELECT ${senderDomainSql} AS sender_domain
+           FROM messages WHERE ${query.whereSql} GROUP BY sender_domain
+         )`,
+      )
+      .get(...query.values) as { count: number }
+  ).count;
+  const rows = db
+    .prepare(`${query.selectSql} LIMIT ? OFFSET ?`)
+    .all(...query.values, query.pageSize, (query.page - 1) * query.pageSize);
+  response.json({ rows, total, page: query.page, pageSize: query.pageSize });
+});
+
+app.get('/api/accounts/:accountId/domains.csv', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const query = buildDomainQuery(accountId, request.query);
+  const rows = db
+    .prepare(query.selectSql)
+    .iterate(...query.values) as Iterable<Record<string, unknown>>;
+
+  response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  response.setHeader(
+    'Content-Disposition',
+    `attachment; filename="gmail-domains-${new Date().toISOString().slice(0, 10)}.csv"`,
+  );
+  response.write(`\ufeff${csvCell('sender_domain')},${csvCell('message_count')}\r\n`);
+  for (const row of rows) {
+    response.write(
+      `${csvCell(row.sender_domain)},${csvCell(row.message_count)}\r\n`,
     );
   }
   response.end();

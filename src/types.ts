@@ -36,6 +36,11 @@ export type Sender = {
   message_count: number;
 };
 
+export type Domain = {
+  sender_domain: string;
+  message_count: number;
+};
+
 export type Page<T> = {
   rows: T[];
   total: number;
