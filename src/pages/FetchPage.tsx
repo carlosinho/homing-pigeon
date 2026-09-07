@@ -155,29 +155,32 @@ export function FetchPage() {
         eyebrow=""
         title="Fetch from gmail"
         description=""
+        action={
+          activeAccount ? (
+            <div className="connection-summary">
+              <div className="connection-mailbox">
+                <span className="plate">Mailbox</span>
+                <strong>{activeAccount.email}</strong>
+              </div>
+              <span className={`status ${activeAccount.connected ? 'connected' : 'disconnected'}`}>
+                {activeAccount.connected ? 'Connected' : 'Disconnected'}
+              </span>
+              {activeAccount.connected ? (
+                <button className="text-button" onClick={() => void disconnect()}>
+                  Disconnect
+                </button>
+              ) : configured ? (
+                <button className="button" onClick={() => void connect()}>
+                  Reconnect
+                </button>
+              ) : null}
+            </div>
+          ) : null
+        }
       />
 
       {error ? <div className="error-banner">{error}</div> : null}
       {pollError ? <div className="error-banner" role="alert">{pollError}</div> : null}
-
-      <section className="connection-line">
-        <p className="plate">Mailbox</p>
-        <strong>{activeAccount?.email}</strong>
-        <span className={`status ${activeAccount?.connected ? 'connected' : 'disconnected'}`}>
-          {activeAccount?.connected ? 'Connected' : 'Disconnected'}
-        </span>
-        <div className="connection-actions">
-          {activeAccount?.connected ? (
-            <button className="text-button" onClick={() => void disconnect()}>
-              Disconnect
-            </button>
-          ) : configured ? (
-            <button className="button" onClick={() => void connect()}>
-              Reconnect
-            </button>
-          ) : null}
-        </div>
-      </section>
 
       <div className="fetch-grid">
         <section>

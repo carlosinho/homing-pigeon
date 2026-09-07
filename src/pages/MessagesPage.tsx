@@ -3,6 +3,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Download,
+  Eye,
   ExternalLink,
   LoaderCircle,
   Search,
@@ -19,16 +20,23 @@ import { Pagination } from '../components/Pagination';
 import type { Message, MessagePage } from '../types';
 
 const columns = [
-  { key: 'sender_email', label: 'Sender', minWidth: '13rem' },
-  { key: 'subject', label: 'Subject', minWidth: '18rem' },
-  { key: 'received_at', label: 'Received', minWidth: '10rem' },
-  { key: 'rfc_message_id', label: 'RFC message ID', minWidth: '14rem' },
-  { key: 'gmail_search', label: 'Gmail search', minWidth: '13rem' },
-  { key: 'gmail_message_id', label: 'Gmail message ID', minWidth: '12rem' },
-  { key: 'gmail_thread_id', label: 'Thread ID', minWidth: '12rem' },
+  { key: 'sender_email', label: 'Sender', minWidth: '13rem', secondary: false },
+  { key: 'subject', label: 'Subject', minWidth: '18rem', secondary: false },
+  { key: 'received_at', label: 'Received', minWidth: '10rem', secondary: false },
+  { key: 'rfc_message_id', label: 'RFC message ID', minWidth: '14rem', secondary: true },
+  { key: 'gmail_search', label: 'Gmail search', minWidth: '13rem', secondary: true },
+  { key: 'gmail_message_id', label: 'Gmail message ID', minWidth: '12rem', secondary: true },
+  { key: 'gmail_thread_id', label: 'Thread ID', minWidth: '12rem', secondary: true },
 ] as const;
 
 type Column = (typeof columns)[number]['key'];
+
+const secondaryColumns = new Set<Column>([
+  'rfc_message_id',
+  'gmail_search',
+  'gmail_message_id',
+  'gmail_thread_id',
+]);
 
 function gmailLink(email: string, message: Message) {
   const search = message.gmail_search || `subject:"${message.subject}" from:${message.sender_email}`;
@@ -54,6 +62,7 @@ export function MessagesPage() {
     gmail_thread_id: '',
   }));
   const [filtersOpen, setFiltersOpen] = useState(Boolean(searchParams.get('sender_email')));
+  const [moreColumnsOpen, setMoreColumnsOpen] = useState(false);
   const [sortBy, setSortBy] = useState<Column>('received_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -139,6 +148,26 @@ export function MessagesPage() {
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   };
 
+  const toggleMoreColumns = () => {
+    if (moreColumnsOpen) {
+      setFilters((current) => ({
+        ...current,
+        rfc_message_id: '',
+        gmail_search: '',
+        gmail_message_id: '',
+        gmail_thread_id: '',
+      }));
+      if (secondaryColumns.has(sortBy)) {
+        setSortBy('received_at');
+        setSortDir('desc');
+      }
+      setPage(1);
+    }
+    setMoreColumnsOpen((current) => !current);
+  };
+
+  const visibleColumns = columns.filter((column) => moreColumnsOpen || !column.secondary);
+
   if (!activeAccount && accounts.length === 0) {
     return (
       <>
@@ -200,6 +229,14 @@ export function MessagesPage() {
           >
             <SlidersHorizontal size={15} /> Column filters
           </button>
+          <button
+            className={`button button-filter ${moreColumnsOpen ? 'active' : ''}`}
+            type="button"
+            aria-pressed={moreColumnsOpen}
+            onClick={toggleMoreColumns}
+          >
+            <Eye size={15} /> More columns
+          </button>
           <span className="result-count value">{result.total.toLocaleString()} messages</span>
         </div>
 
@@ -228,7 +265,7 @@ export function MessagesPage() {
           <table>
             <thead>
               <tr>
-                {columns.map((column) => (
+                {visibleColumns.map((column) => (
                   <th key={column.key} style={{ minWidth: column.minWidth }}>
                     <button
                       className={column.key === sortBy ? 'sorted' : ''}
@@ -242,7 +279,7 @@ export function MessagesPage() {
               </tr>
               {filtersOpen ? (
                 <tr className="filter-row">
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th key={column.key}>
                       <input
                         value={filters[column.key]}
@@ -265,10 +302,14 @@ export function MessagesPage() {
                   <td className="sender-cell">{message.sender_email || 'Unknown sender'}</td>
                   <td className="subject-cell" title={message.subject}>{message.subject || '(No subject)'}</td>
                   <td className="value-cell">{new Date(message.received_at).toLocaleString()}</td>
-                  <td className="value-cell" title={message.rfc_message_id}>{message.rfc_message_id || '—'}</td>
-                  <td className="value-cell" title={message.gmail_search}>{message.gmail_search || '—'}</td>
-                  <td className="value-cell">{message.gmail_message_id}</td>
-                  <td className="value-cell">{message.gmail_thread_id}</td>
+                  {moreColumnsOpen ? (
+                    <>
+                      <td className="value-cell" title={message.rfc_message_id}>{message.rfc_message_id || '—'}</td>
+                      <td className="value-cell" title={message.gmail_search}>{message.gmail_search || '—'}</td>
+                      <td className="value-cell">{message.gmail_message_id}</td>
+                      <td className="value-cell">{message.gmail_thread_id}</td>
+                    </>
+                  ) : null}
                   <td className="sticky-action">
                     <a
                       className="icon-button"
@@ -285,7 +326,7 @@ export function MessagesPage() {
               ))}
               {!loading && !result.rows.length ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={visibleColumns.length + 1} className="table-empty">
                     No messages match these filters. Fetch mail or clear a filter.
                   </td>
                 </tr>

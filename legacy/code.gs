@@ -1,3 +1,4 @@
+// Archived reference for the Google Sheets workflow that preceded Homing Pigeon.
 const QUERY = 'after:2014/11/01 before:2015/01/01 in:inbox';
 
 // All received mail, including archived messages:

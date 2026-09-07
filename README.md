@@ -1,6 +1,6 @@
 # Homing Pigeon
 
-Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
+Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `legacy/code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
 
 Homing Pigeon is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
 
@@ -50,7 +50,7 @@ If the process stops during a fetch, that job is returned to the queue on the ne
 
 ### 3. Browse messages
 
-The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. The external-link action opens a Gmail search for the selected message.
+The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. Sender, subject, and received date are shown by default; **More columns** reveals the RFC message ID, Gmail search, Gmail message ID, and thread ID. The external-link action opens a Gmail search for the selected message.
 
 The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` representation in SQLite, while dates displayed in the browser use the browser's local timezone.
 
@@ -86,7 +86,7 @@ CSV output includes a UTF-8 BOM, quotes every value, and prefixes cells beginnin
 
 ## Google OAuth setup
 
-For Google Cloud setup instructions read `GoogleOAuth.md`
+Information moved to `GoogleOAuth.md`
 
 ## Configuration
 
@@ -157,7 +157,8 @@ To reset Homing Pigeon completely, stop the backend and remove `.data/`. This re
 
 ```text
 .
-├── code.gs                    # Original Apps Script; retained as reference and not used at runtime
+├── legacy/
+│   └── code.gs                # Original Apps Script; retained as reference and not used at runtime
 ├── src/
 │   ├── assets/                # Frontend image assets, including the Homing Pigeon logo
 │   ├── pages/                 # Fetch, Messages, Senders, and Domains screens
@@ -233,7 +234,7 @@ Domain list and CSV parameters:
 
 These features were discussed or are natural continuations, but none exists in the current code:
 
-- Archive, label, trash, delete, or unsubscribe actions. These would require `gmail.modify`, explicit confirmation, and an audit trail.
+- Archive, label, trash, delete actions. These would require `gmail.modify`, explicit confirmation, and an audit trail.
 - Pause or cancel controls for queued and running jobs.
 - Per-fetch result snapshots and filtering. The current inventory is cumulative by account and has no job-to-message join table.
 - Durable Gmail page-token checkpoints. Restarted jobs currently enumerate their query again from page one.

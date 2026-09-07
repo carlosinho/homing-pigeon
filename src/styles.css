@@ -567,24 +567,24 @@ textarea:disabled {
 
 /* ---------- fetch page ---------- */
 
-.connection-line {
+.connection-summary {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 18px 28px;
-  margin-bottom: 48px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--rule);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px 22px;
 }
 
-.connection-line strong {
+.connection-mailbox {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.connection-mailbox strong {
   font-size: 1rem;
   font-stretch: condensed;
   font-weight: 400;
-}
-
-.connection-actions {
-  margin-left: auto;
 }
 
 .fetch-grid {
@@ -1158,9 +1158,8 @@ tbody tr:hover td.sticky-action {
     justify-content: flex-start;
   }
 
-  .connection-actions {
-    width: 100%;
-    margin-left: 0;
+  .connection-summary {
+    justify-content: flex-start;
   }
 
   .history-row {

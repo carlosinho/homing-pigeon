@@ -224,7 +224,7 @@ React Router defines four routes under a shared `Layout`: `/fetch`, `/messages`,
 
 `AccountProvider` is the only shared client state. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
 
-The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. All three use server-side count, sorting, filtering, and fixed 25-row pages.
+The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. All three use server-side count, sorting, filtering, and fixed 25-row pages. The Messages table initially renders sender, subject, and received date; its **More columns** control reveals the four stored technical identifiers. Hiding those columns clears their filters and restores received-date sorting if a hidden column was selected.
 
 The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized.
 
@@ -310,7 +310,7 @@ npm test
 
 There are no automated tests for OAuth, Gmail requests, retry timing, worker recovery, CSV output, Express routes, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
 
-`code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
+`legacy/code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
 
 Dependency versions are recorded in `package-lock.json`. The backend and frontend share one root package rather than separate workspaces.
 
