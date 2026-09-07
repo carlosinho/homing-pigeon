@@ -78,7 +78,7 @@ OAuth credentials live on the account row so multiple Gmail accounts can coexist
 | `account_id` | Owning account; foreign key with `ON DELETE CASCADE`. |
 | `query` | Raw Gmail query submitted by the user. |
 | `status` | Application state: `queued`, `running`, `completed`, or `failed`. The database does not enforce an enum constraint. |
-| `total_estimate` | Latest `resultSizeEstimate` from Gmail, or discovered count when Gmail does not provide one. It is an estimate, not an invariant. |
+| `total_estimate` | Larger of Gmail's latest `resultSizeEstimate` and the count discovered during the current attempt. It is an estimate, not an invariant. |
 | `discovered_count` | IDs returned by `messages.list` during the current attempt. |
 | `processed_count` | New rows handled during the current attempt. |
 | `skipped_count` | Matching IDs that already existed during the current attempt. |
@@ -142,7 +142,7 @@ For each job, the worker:
 1. Loads the account and fails if both access and refresh tokens are absent.
 2. Marks the job `running`, resets all counters, clears the old error and completion time, and replaces `started_at`.
 3. Calls `users.messages.list` with the raw query, `userId: me`, and `maxResults: 500`.
-4. Adds the returned page length to `discovered_count` and records Gmail's latest result estimate.
+4. Adds the returned page length to `discovered_count` and records the larger of that count and Gmail's latest result estimate.
 5. Checks each returned Gmail ID against `(account_id, gmail_message_id)`.
 6. For a known ID, increments `skipped_count` without contacting `messages.get`.
 7. For a new ID, calls `users.messages.get` with `format: full` and a partial-response field mask that includes headers, size estimate, and nested MIME metadata while excluding body data.

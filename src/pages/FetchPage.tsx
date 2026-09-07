@@ -95,12 +95,15 @@ export function FetchPage() {
   const activeJob = jobs.find(
     (job) => job.status === 'running' || job.status === 'queued',
   );
+  const effectiveEstimate = activeJob
+    ? Math.max(activeJob.total_estimate, activeJob.discovered_count)
+    : 0;
   const progress = activeJob
     ? Math.min(
         100,
         Math.round(
           ((activeJob.processed_count + activeJob.skipped_count) /
-            Math.max(activeJob.total_estimate, activeJob.discovered_count, 1)) *
+            Math.max(effectiveEstimate, 1)) *
             100,
         ),
       )
@@ -241,7 +244,7 @@ export function FetchPage() {
                 </span>
                 <span>
                   {(activeJob.processed_count + activeJob.skipped_count).toLocaleString()} /{' '}
-                  {Math.max(activeJob.total_estimate, activeJob.discovered_count).toLocaleString()}
+                  {effectiveEstimate.toLocaleString()}
                 </span>
               </div>
               <div className="progress-stats value">
@@ -251,10 +254,10 @@ export function FetchPage() {
                 </div>
                 <div>
                   <strong>{activeJob.skipped_count.toLocaleString()}</strong>
-                  <span>already stored</span>
+                  <span>duplicate</span>
                 </div>
                 <div>
-                  <strong>{activeJob.total_estimate.toLocaleString()}</strong>
+                  <strong>{effectiveEstimate.toLocaleString()}</strong>
                   <span>estimated</span>
                 </div>
               </div>

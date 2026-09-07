@@ -125,7 +125,8 @@ async function processJob(job: JobRecord) {
 
     const messages = page.data.messages || [];
     discovered += messages.length;
-    updateDiscovery.run(page.data.resultSizeEstimate || discovered, discovered, job.id);
+    const totalEstimate = Math.max(page.data.resultSizeEstimate ?? 0, discovered);
+    updateDiscovery.run(totalEstimate, discovered, job.id);
 
     for (const item of messages) {
       if (!item.id) continue;
