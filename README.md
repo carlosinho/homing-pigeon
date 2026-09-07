@@ -1,6 +1,6 @@
 # Homing Pigeon
 
-Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and domains account for most of the mail in an account? It replaces the original `legacy/code.gs` spreadsheet export with a browser interface, a background fetch process, local persistence, and CSV exports.
+Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and messages account for the most storage in an account? Gives you a browser interface, a background fetch process, local persistence, and CSV exports.
 
 Homing Pigeon is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
 
@@ -15,8 +15,10 @@ Homing Pigeon runs the same search syntax as the Gmail search box and stores one
 - `gmail_search`, generated as `rfc822msgid:<id>` when an RFC Message-ID is available
 - `gmail_message_id`
 - `gmail_thread_id`
+- Gmail's estimated message size
+- attachment count, size, filename, and MIME type metadata
 
-The app requests message metadata, not message bodies or attachments. Repeating or overlapping searches does not create duplicate rows because messages are unique by Gmail account and Gmail message ID.
+The app requests headers, size estimates, and MIME metadata, but excludes message bodies and attachment data. Repeating or overlapping searches does not create duplicate rows because messages are unique by Gmail account and Gmail message ID.
 
 The inventory is cumulative for each account. A completed fetch adds new messages to that account's existing inventory; the Messages and Senders screens are not limited to the results of one particular fetch.
 
@@ -42,7 +44,7 @@ in:inbox older:1y
 in:anywhere -from:me -in:drafts -in:spam -in:trash
 ```
 
-The backend lists matching Gmail messages in pages of up to 500, fetches the three required headers plus Gmail metadata for each new message, and records progress in SQLite. The browser can be closed while a fetch runs, but the Node process must remain running.
+The backend lists matching Gmail messages in pages of up to 500, fetches the required headers, estimated size, and attachment metadata for each new message, and records progress in SQLite. The browser can be closed while a fetch runs, but the Node process must remain running.
 
 Only one fetch is processed at a time across all connected accounts. Gmail requests are sequential and throttled by `REQUEST_DELAY_MS`. Temporary quota and server errors are retried with exponential backoff.
 
@@ -50,19 +52,19 @@ If the process stops during a fetch, that job is returned to the queue on the ne
 
 ### 3. Browse messages
 
-The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. Sender, subject, and received date are shown by default; **More columns** reveals the RFC message ID, Gmail search, Gmail message ID, and thread ID. The external-link action opens a Gmail search for the selected message.
+The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. It defaults to largest messages first and shows message size plus expandable attachment metadata. **More columns** reveals the RFC message ID, Gmail search, Gmail message ID, and thread ID. The external-link action opens a Gmail search for the selected message.
 
 The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` representation in SQLite, while dates displayed in the browser use the browser's local timezone.
 
 ### 4. Rank senders and domains
 
-The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the highest message count first. Selecting a sender opens the Messages screen with that sender filter applied.
+The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the greatest combined message size and also shows message count. Selecting a sender opens the Messages screen with that sender filter applied.
 
 The Domains screen derives the portion after `@` from each normalized sender email and groups messages by that domain. Sender values without a domain are grouped under Unknown domain. Selecting a domain opens the Messages screen with an exact domain filter applied.
 
 ### 5. Export CSV
 
-The Messages, Senders, and Domains screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files contain the seven stored fields, with `received_at` formatted as an ISO timestamp. Sender CSV files contain `sender_email` and `message_count`; domain CSV files contain `sender_domain` and `message_count`.
+The Messages, Senders, and Domains screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files include message size and attachment metadata. Sender CSV files include `sender_email`, `message_count`, and `total_size_bytes`; domain CSV files contain `sender_domain` and `message_count`.
 
 CSV output includes a UTF-8 BOM, quotes every value, and prefixes cells beginning with `=`, `+`, `-`, or `@` to reduce spreadsheet formula-injection risk.
 
@@ -211,7 +213,7 @@ Message list and CSV parameters:
 - `search`: substring search across `sender_email` and `subject`
 - `sender_domain`: exact derived sender-domain filter, including an empty value for messages without a domain
 - any stored field name: per-column substring filter
-- `sortBy`: one of the seven stored field names; defaults to `received_at`
+- `sortBy`: a stored public field, including message and attachment size; defaults to `received_at` in the API and `size_bytes` in the Messages UI
 - `sortDir`: `asc` or `desc`; any value other than `asc` becomes descending
 - `page`: one-based page number; list endpoint only
 - `pageSize`: clamped to 10–100 and defaults to 25; list endpoint only
@@ -219,7 +221,7 @@ Message list and CSV parameters:
 Sender list and CSV parameters:
 
 - `search`: sender-email substring search
-- `sortBy`: `sender_email` or `message_count`; defaults to `message_count`
+- `sortBy`: `sender_email`, `message_count`, or `total_size_bytes`; defaults to `total_size_bytes`
 - `sortDir`: `asc` or `desc`
 - `page` and `pageSize`: list endpoint only, with the same bounds as messages
 
@@ -239,9 +241,8 @@ These features were discussed or are natural continuations, but none exists in t
 - Per-fetch result snapshots and filtering. The current inventory is cumulative by account and has no job-to-message join table.
 - Durable Gmail page-token checkpoints. Restarted jobs currently enumerate their query again from page one.
 - Automatic date-range splitting for very large searches.
-- Incremental synchronization through Gmail History, scheduled fetches, or background operation when the Node process is not running.
 - Refreshing previously stored messages or removing local rows when messages are deleted or no longer match a Gmail query.
-- Additional headers or metadata such as labels, sender display names, message size, and `List-Unsubscribe`.
+- Additional headers or metadata such as labels, sender display names, and `List-Unsubscribe`.
 - UI controls to delete an account and its local data or revoke the OAuth grant at Google.
 - Full-text search, cursor pagination, batched metadata requests, or concurrent per-account workers for larger datasets.
 - Versioned database migrations. The current schema is created with `CREATE TABLE IF NOT EXISTS` statements at startup.

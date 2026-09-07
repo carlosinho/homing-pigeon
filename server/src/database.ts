@@ -55,6 +55,10 @@ db.exec(`
     gmail_search TEXT NOT NULL DEFAULT '',
     gmail_message_id TEXT NOT NULL,
     gmail_thread_id TEXT NOT NULL DEFAULT '',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    attachment_count INTEGER NOT NULL DEFAULT 0,
+    attachment_bytes INTEGER NOT NULL DEFAULT 0,
+    attachments_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(account_id, gmail_message_id)
   );
@@ -79,6 +83,8 @@ db.exec(`
     ON messages(account_id, sender_email);
   CREATE INDEX IF NOT EXISTS idx_messages_account_subject
     ON messages(account_id, subject);
+  CREATE INDEX IF NOT EXISTS idx_messages_account_size
+    ON messages(account_id, size_bytes DESC);
 `);
 
 db.prepare(

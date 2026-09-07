@@ -16,6 +16,7 @@ import {
   buildSenderQuery,
   csvCell,
   messageColumns,
+  messageSelectColumns,
   senderDomainSql,
 } from './query.js';
 import { wakeWorker } from './worker.js';
@@ -26,6 +27,14 @@ app.use(express.json({ limit: '32kb' }));
 
 const idSchema = z.coerce.number().int().positive();
 const jobSchema = z.object({ query: z.string().trim().min(1).max(1_000) });
+
+function messageResponseRow(row: Record<string, unknown>) {
+  const { attachments_json: attachmentsJson, ...message } = row;
+  return {
+    ...message,
+    attachments: JSON.parse(String(attachmentsJson || '[]')) as unknown[],
+  };
+}
 
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true });
@@ -191,7 +200,7 @@ app.get('/api/accounts/:accountId/messages', (request, response) => {
   ).count;
   const rows = db
     .prepare(
-      `SELECT ${messageColumns.join(', ')}
+      `SELECT ${messageSelectColumns.join(', ')}
        FROM messages WHERE ${query.whereSql}
        ORDER BY ${query.orderSql} LIMIT ? OFFSET ?`,
     )
@@ -199,9 +208,9 @@ app.get('/api/accounts/:accountId/messages', (request, response) => {
       ...query.values,
       query.pageSize,
       (query.page - 1) * query.pageSize,
-    );
+    ) as Record<string, unknown>[];
   response.json({
-    rows,
+    rows: rows.map(messageResponseRow),
     total,
     inventoryTotal,
     page: query.page,
@@ -214,7 +223,7 @@ app.get('/api/accounts/:accountId/messages.csv', (request, response) => {
   const query = buildMessageQuery(accountId, request.query);
   const rows = db
     .prepare(
-      `SELECT ${messageColumns.join(', ')}
+      `SELECT ${messageSelectColumns.join(', ')}
        FROM messages WHERE ${query.whereSql} ORDER BY ${query.orderSql}`,
     )
     .iterate(...query.values) as Iterable<Record<string, unknown>>;
@@ -224,11 +233,13 @@ app.get('/api/accounts/:accountId/messages.csv', (request, response) => {
     'Content-Disposition',
     `attachment; filename="gmail-messages-${new Date().toISOString().slice(0, 10)}.csv"`,
   );
-  response.write(`\ufeff${messageColumns.map(csvCell).join(',')}\r\n`);
+  const csvColumns = [...messageColumns, 'attachments'] as const;
+  response.write(`\ufeff${csvColumns.map(csvCell).join(',')}\r\n`);
   for (const row of rows) {
-    const values = messageColumns.map((column) => {
-      const value =
-        column === 'received_at'
+    const values = csvColumns.map((column) => {
+      const value = column === 'attachments'
+        ? row.attachments_json
+        : column === 'received_at'
           ? new Date(Number(row[column])).toISOString()
           : row[column];
       return csvCell(value);
@@ -268,10 +279,16 @@ app.get('/api/accounts/:accountId/senders.csv', (request, response) => {
     'Content-Disposition',
     `attachment; filename="gmail-senders-${new Date().toISOString().slice(0, 10)}.csv"`,
   );
-  response.write(`\ufeff${csvCell('sender_email')},${csvCell('message_count')}\r\n`);
+  response.write(
+    `\ufeff${['sender_email', 'message_count', 'total_size_bytes']
+      .map(csvCell)
+      .join(',')}\r\n`,
+  );
   for (const row of rows) {
     response.write(
-      `${csvCell(row.sender_email)},${csvCell(row.message_count)}\r\n`,
+      `${[row.sender_email, row.message_count, row.total_size_bytes]
+        .map(csvCell)
+        .join(',')}\r\n`,
     );
   }
   response.end();

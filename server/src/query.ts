@@ -8,7 +8,12 @@ export const messageColumns = [
   'gmail_search',
   'gmail_message_id',
   'gmail_thread_id',
+  'size_bytes',
+  'attachment_count',
+  'attachment_bytes',
 ] as const;
+
+export const messageSelectColumns = [...messageColumns, 'attachments_json'] as const;
 
 type MessageColumn = (typeof messageColumns)[number];
 
@@ -84,13 +89,17 @@ export function buildSenderQuery(accountId: number, query: ParsedQs) {
   const search = text(query.search);
   const whereSql = search ? 'account_id = ? AND sender_email LIKE ?' : 'account_id = ?';
   const values = search ? [accountId, `%${search}%`] : [accountId];
-  const sortBy = query.sortBy === 'sender_email' ? 'sender_email' : 'message_count';
+  const requestedSort = text(query.sortBy);
+  const sortBy = ['sender_email', 'message_count', 'total_size_bytes'].includes(requestedSort)
+    ? requestedSort
+    : 'total_size_bytes';
   const direction = query.sortDir === 'asc' ? 'ASC' : 'DESC';
 
   return {
     whereSql,
     values,
-    selectSql: `SELECT sender_email, COUNT(*) AS message_count
+    selectSql: `SELECT sender_email, COUNT(*) AS message_count,
+                       COALESCE(SUM(size_bytes), 0) AS total_size_bytes
                 FROM messages WHERE ${whereSql}
                 GROUP BY sender_email
                 ORDER BY ${sortBy} ${direction}, sender_email ASC`,

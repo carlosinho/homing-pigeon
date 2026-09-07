@@ -17,11 +17,14 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
+import { formatBytes } from '../formats';
 import type { Message, MessagePage } from '../types';
 
 const columns = [
   { key: 'sender_email', label: 'Sender', minWidth: '13rem', secondary: false },
   { key: 'subject', label: 'Subject', minWidth: '18rem', secondary: false },
+  { key: 'size_bytes', label: 'Size', minWidth: '7rem', secondary: false },
+  { key: 'attachment_bytes', label: 'Attachments', minWidth: '13rem', secondary: false },
   { key: 'received_at', label: 'Received', minWidth: '10rem', secondary: false },
   { key: 'rfc_message_id', label: 'RFC message ID', minWidth: '14rem', secondary: true },
   { key: 'gmail_search', label: 'Gmail search', minWidth: '13rem', secondary: true },
@@ -60,10 +63,12 @@ export function MessagesPage() {
     gmail_search: '',
     gmail_message_id: '',
     gmail_thread_id: '',
+    size_bytes: '',
+    attachment_bytes: '',
   }));
   const [filtersOpen, setFiltersOpen] = useState(Boolean(searchParams.get('sender_email')));
   const [moreColumnsOpen, setMoreColumnsOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<Column>('received_at');
+  const [sortBy, setSortBy] = useState<Column>('size_bytes');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<MessagePage>({
@@ -158,7 +163,7 @@ export function MessagesPage() {
         gmail_thread_id: '',
       }));
       if (secondaryColumns.has(sortBy)) {
-        setSortBy('received_at');
+        setSortBy('size_bytes');
         setSortDir('desc');
       }
       setPage(1);
@@ -301,6 +306,24 @@ export function MessagesPage() {
                 <tr key={message.gmail_message_id}>
                   <td className="sender-cell">{message.sender_email || 'Unknown sender'}</td>
                   <td className="subject-cell" title={message.subject}>{message.subject || '(No subject)'}</td>
+                  <td className="value-cell storage-cell">{formatBytes(message.size_bytes)}</td>
+                  <td className="value-cell attachment-cell">
+                    {message.attachment_count ? (
+                      <details>
+                        <summary>
+                          {message.attachment_count.toLocaleString()} {message.attachment_count === 1 ? 'file' : 'files'} · {formatBytes(message.attachment_bytes)}
+                        </summary>
+                        <ul>
+                          {message.attachments.map((attachment, index) => (
+                            <li key={`${attachment.filename}-${index}`}>
+                              <span title={attachment.filename}>{attachment.filename}</span>
+                              <small>{attachment.mimeType} · {formatBytes(attachment.sizeBytes)}</small>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : '—'}
+                  </td>
                   <td className="value-cell">{new Date(message.received_at).toLocaleString()}</td>
                   {moreColumnsOpen ? (
                     <>

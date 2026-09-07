@@ -3,7 +3,9 @@ import { config } from './config.js';
 import { db, getAccount, type JobRecord } from './database.js';
 import { createOAuthClient } from './google-auth.js';
 import {
+  extractAttachments,
   extractEmailAddress,
+  gmailMessageFields,
   getHeader,
   normalizeMessageId,
 } from './parsers.js';
@@ -95,8 +97,9 @@ async function processJob(job: JobRecord) {
   const insertMessage = db.prepare(
     `INSERT OR IGNORE INTO messages
      (account_id, sender_email, subject, received_at, rfc_message_id,
-      gmail_search, gmail_message_id, gmail_thread_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      gmail_search, gmail_message_id, gmail_thread_id, size_bytes,
+      attachment_count, attachment_bytes, attachments_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const updateDiscovery = db.prepare(
     'UPDATE fetch_jobs SET total_estimate = ?, discovered_count = ? WHERE id = ?',
@@ -136,8 +139,8 @@ async function processJob(job: JobRecord) {
           gmail.users.messages.get({
             userId: 'me',
             id: item.id!,
-            format: 'metadata',
-            metadataHeaders: ['From', 'Subject', 'Message-ID'],
+            format: 'full',
+            fields: gmailMessageFields,
           }),
         );
 
@@ -146,6 +149,11 @@ async function processJob(job: JobRecord) {
         const subject = getHeader(headers, 'Subject');
         const rfcMessageId = normalizeMessageId(getHeader(headers, 'Message-ID'));
         const receivedAt = Number(response.data.internalDate || Date.now());
+        const attachments = extractAttachments(response.data.payload);
+        const attachmentBytes = attachments.reduce(
+          (total, attachment) => total + attachment.sizeBytes,
+          0,
+        );
 
         insertMessage.run(
           job.account_id,
@@ -156,6 +164,10 @@ async function processJob(job: JobRecord) {
           rfcMessageId ? `rfc822msgid:${rfcMessageId}` : '',
           item.id,
           response.data.threadId || item.threadId || '',
+          Math.max(0, Number(response.data.sizeEstimate) || 0),
+          attachments.length,
+          attachmentBytes,
+          JSON.stringify(attachments),
         );
         processed += 1;
       }

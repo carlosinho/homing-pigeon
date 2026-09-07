@@ -6,13 +6,14 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
+import { formatBytes } from '../formats';
 import type { Page, Sender } from '../types';
 
 export function SendersPage() {
   const { activeAccount, accounts } = useAccount();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'sender_email' | 'message_count'>('message_count');
+  const [sortBy, setSortBy] = useState<'sender_email' | 'message_count' | 'total_size_bytes'>('total_size_bytes');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<Page<Sender>>({ rows: [], total: 0, page: 1, pageSize: 25 });
@@ -47,16 +48,16 @@ export function SendersPage() {
     };
   }, [activeAccount, params]);
 
-  const toggleSort = (column: 'sender_email' | 'message_count') => {
+  const toggleSort = (column: 'sender_email' | 'message_count' | 'total_size_bytes') => {
     if (sortBy === column) setSortDir((value) => (value === 'asc' ? 'desc' : 'asc'));
     else {
       setSortBy(column);
-      setSortDir(column === 'message_count' ? 'desc' : 'asc');
+      setSortDir(column === 'sender_email' ? 'asc' : 'desc');
     }
     setPage(1);
   };
 
-  const largest = result.rows.reduce((max, sender) => Math.max(max, sender.message_count), 0);
+  const largest = result.rows.reduce((max, sender) => Math.max(max, sender.total_size_bytes), 0);
 
   if (!activeAccount && accounts.length === 0) {
     return (
@@ -117,7 +118,16 @@ export function SendersPage() {
                     {sortBy === 'sender_email' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
                   </button>
                 </th>
-                <th className="volume-column"><span className="sr-only">Share of the largest sender on this page</span></th>
+                <th className="volume-column"><span className="sr-only">Share of the largest sender by storage on this page</span></th>
+                <th className="storage-column">
+                  <button
+                    className={sortBy === 'total_size_bytes' ? 'sorted' : ''}
+                    onClick={() => toggleSort('total_size_bytes')}
+                  >
+                    Storage
+                    {sortBy === 'total_size_bytes' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
+                  </button>
+                </th>
                 <th className="count-column">
                   <button
                     className={sortBy === 'message_count' ? 'sorted' : ''}
@@ -143,15 +153,16 @@ export function SendersPage() {
                   <td className="volume-column">
                     <span
                       className="volume"
-                      style={{ width: `${largest ? (sender.message_count / largest) * 100 : 0}%` }}
+                      style={{ width: `${largest ? (sender.total_size_bytes / largest) * 100 : 0}%` }}
                       aria-hidden="true"
                     />
                   </td>
+                  <td className="storage-column value">{formatBytes(sender.total_size_bytes)}</td>
                   <td className="count-column value">{sender.message_count.toLocaleString()}</td>
                 </tr>
               ))}
               {!loading && !result.rows.length ? (
-                <tr><td colSpan={4} className="table-empty">No senders match this search.</td></tr>
+                <tr><td colSpan={5} className="table-empty">No senders match this search.</td></tr>
               ) : null}
             </tbody>
           </table>

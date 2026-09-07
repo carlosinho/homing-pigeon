@@ -35,7 +35,7 @@ In development, Vite serves the browser application on port 5173 and proxies `/a
 6. The Messages, Senders, and Domains APIs always query the cumulative inventory for an account, regardless of which query originally found a message.
 7. Exactly one in-process worker loop may be active. It processes queued jobs serially across all accounts.
 8. Gmail calls inside a job are sequential and share one process-wide minimum request delay.
-9. The implementation requests Gmail metadata only. It never requests bodies or attachments, although OAuth must use the broader `gmail.readonly` scope to support Gmail's `q` search parameter.
+9. The implementation requests headers, message-size estimates, and MIME metadata through a partial response that excludes body and attachment data.
 10. Disconnecting an account removes local tokens but preserves its account row, messages, and fetch jobs.
 11. The active account in the browser is a UI preference stored under `mailroom.activeAccount` in `localStorage`; it is not an authorization boundary.
 12. Deleting an account's local messages preserves its account, OAuth tokens, and fetch jobs. With the message rows gone, a later fetch can import the same Gmail IDs again.
@@ -100,6 +100,10 @@ The API reads the 12 newest jobs and 12 newest local-data events for the active 
 | `gmail_search` | `rfc822msgid:` plus the normalized RFC ID, or an empty string. |
 | `gmail_message_id` | Gmail's internal message ID. |
 | `gmail_thread_id` | Thread ID from `messages.get`, falling back to `messages.list`, then an empty string. |
+| `size_bytes` | Gmail's estimated message size in bytes. |
+| `attachment_count` | Number of MIME parts with filenames. |
+| `attachment_bytes` | Combined reported size of those attachment parts. |
+| `attachments_json` | Attachment filename, MIME type, and size metadata. |
 | `created_at` | Time the local row was first inserted. |
 
 Indexes support recent-job lookup, queued-job lookup, received-date ordering, sender grouping/filtering, and subject filtering. No index exists for RFC ID, Gmail search, or thread ID; Gmail message ID is covered by the composite unique constraint.
@@ -141,7 +145,7 @@ For each job, the worker:
 4. Adds the returned page length to `discovered_count` and records Gmail's latest result estimate.
 5. Checks each returned Gmail ID against `(account_id, gmail_message_id)`.
 6. For a known ID, increments `skipped_count` without contacting `messages.get`.
-7. For a new ID, calls `users.messages.get` with `format: metadata` and `metadataHeaders: [From, Subject, Message-ID]`, derives the seven stored fields, and inserts with `INSERT OR IGNORE`.
+7. For a new ID, calls `users.messages.get` with `format: full` and a partial-response field mask that includes headers, size estimate, and nested MIME metadata while excluding body data.
 8. Updates processed and skipped counters every ten handled IDs and at the end of every Gmail list page.
 9. Follows `nextPageToken` until Gmail returns none.
 10. Marks the job `completed` and writes its final counters and completion time.
@@ -208,7 +212,7 @@ The list endpoint performs a count query and then an offset-based row query. The
 
 Sender endpoints group by the stored `sender_email`; aliases are not merged beyond lowercase normalization. Search is a parameterized `LIKE` against `sender_email`, but unlike message filtering it does not escape `%` or `_`, so those characters act as SQL wildcard patterns.
 
-Sender sorting allows only `sender_email` or `message_count`. Invalid values default to count. The list endpoint uses count plus offset pagination; the CSV endpoint streams the complete filtered grouping.
+Sender sorting allows `sender_email`, `message_count`, or combined `total_size_bytes`. Invalid values default to total size. The list endpoint uses count plus offset pagination; the CSV endpoint streams the complete filtered grouping.
 
 ### Domain queries
 
@@ -224,7 +228,7 @@ React Router defines four routes under a shared `Layout`: `/fetch`, `/messages`,
 
 `AccountProvider` is the only shared client state. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
 
-The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. All three use server-side count, sorting, filtering, and fixed 25-row pages. The Messages table initially renders sender, subject, and received date; its **More columns** control reveals the four stored technical identifiers. Hiding those columns clears their filters and restores received-date sorting if a hidden column was selected.
+The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. Messages defaults to estimated size descending and shows attachment metadata; Senders defaults to combined estimated size.
 
 The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized.
 
@@ -320,7 +324,6 @@ Possible additions should preserve the account/message uniqueness invariant but 
 
 - Add a `fetch_job_messages` join table if per-fetch snapshots or query-specific result views are needed.
 - Persist list cursors or per-message work items if restarts must resume near the interruption point instead of replaying a query.
-- Add Gmail History synchronization for incremental refresh and local deletion reconciliation.
 - Move work to a durable external queue before running multiple API replicas.
 - Introduce per-account scheduling and rate limits before parallelizing account fetches.
 - Add FTS or a search service and cursor pagination when offset/`LIKE` performance becomes material.

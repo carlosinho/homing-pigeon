@@ -29,6 +29,12 @@ export type ActivityEvent = {
   created_at: string;
 };
 
+export type MessageAttachment = {
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type Message = {
   sender_email: string;
   subject: string;
@@ -37,11 +43,16 @@ export type Message = {
   gmail_search: string;
   gmail_message_id: string;
   gmail_thread_id: string;
+  size_bytes: number;
+  attachment_count: number;
+  attachment_bytes: number;
+  attachments: MessageAttachment[];
 };
 
 export type Sender = {
   sender_email: string;
   message_count: number;
+  total_size_bytes: number;
 };
 
 export type Domain = {

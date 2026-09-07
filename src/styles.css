@@ -952,6 +952,46 @@ tbody tr:hover td {
   text-overflow: ellipsis;
 }
 
+.storage-cell {
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+
+.attachment-cell {
+  overflow: visible;
+  white-space: normal;
+}
+
+.attachment-cell summary {
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.attachment-cell ul {
+  margin: 10px 0 2px;
+  padding: 0;
+  list-style: none;
+}
+
+.attachment-cell li + li {
+  margin-top: 8px;
+}
+
+.attachment-cell li span,
+.attachment-cell li small {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-cell li small {
+  color: var(--ink-3);
+  font-size: 0.76rem;
+}
+
 .filter-row th {
   height: auto;
   padding-top: 8px;
@@ -1057,6 +1097,17 @@ tbody tr:hover td.sticky-action {
 }
 
 .count-column button {
+  margin-left: auto;
+}
+
+.storage-column {
+  width: 126px;
+  color: var(--ink-2);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.storage-column button {
   margin-left: auto;
 }
 
