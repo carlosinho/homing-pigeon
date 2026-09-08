@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Download, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, LoaderCircle, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from '../account-context';
@@ -16,8 +16,13 @@ export function DomainsPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<Page<Domain>>({ rows: [], total: 0, page: 1, pageSize: 25 });
+  const [resultAccountId, setResultAccountId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingDeleteDomain, setPendingDeleteDomain] = useState('');
+  const [deletingDomain, setDeletingDomain] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const params = useMemo(
     () => ({ search, sortBy, sortDir, page, pageSize: 25 }),
     [page, search, sortBy, sortDir],
@@ -25,6 +30,8 @@ export function DomainsPage() {
 
   useEffect(() => {
     if (!activeAccount) return;
+    setResultAccountId(null);
+    setPendingDeleteDomain('');
     let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -32,6 +39,7 @@ export function DomainsPage() {
         const result = await api.domains(activeAccount.id, params);
         if (!active) return;
         setResult(result);
+        setResultAccountId(activeAccount.id);
         setError('');
       } catch (caught) {
         if (active) {
@@ -45,7 +53,36 @@ export function DomainsPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [activeAccount, params]);
+  }, [activeAccount, params, reloadKey]);
+
+  const deleteDomain = async (domain: Domain) => {
+    if (
+      !activeAccount ||
+      resultAccountId !== activeAccount.id ||
+      deletingDomain ||
+      !domain.sender_domain
+    ) return;
+
+    setDeletingDomain(domain.sender_domain);
+    setError('');
+    setNotice('');
+    try {
+      const { deletedCount } = await api.deleteDomain(
+        activeAccount.id,
+        domain.sender_domain,
+      );
+      setPendingDeleteDomain('');
+      setPage(1);
+      setReloadKey((current) => current + 1);
+      setNotice(
+        `${deletedCount.toLocaleString()} local ${deletedCount === 1 ? 'message' : 'messages'} deleted.`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete local domain messages.');
+    } finally {
+      setDeletingDomain('');
+    }
+  };
 
   const toggleSort = (column: 'sender_domain' | 'message_count') => {
     if (sortBy === column) setSortDir((value) => (value === 'asc' ? 'desc' : 'asc'));
@@ -102,7 +139,8 @@ export function DomainsPage() {
             />
           </label>
         </div>
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div className="error-banner" role="alert">{error}</div> : null}
+        {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
         <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
           <table className="sender-table">
             <thead>
@@ -127,6 +165,7 @@ export function DomainsPage() {
                     {sortBy === 'message_count' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
                   </button>
                 </th>
+                <th className="row-delete-column"><span className="sr-only">Delete</span></th>
               </tr>
             </thead>
             <tbody>
@@ -148,10 +187,38 @@ export function DomainsPage() {
                     />
                   </td>
                   <td className="count-column value">{domain.message_count.toLocaleString()}</td>
+                  <td className="row-delete-column" onClick={(event) => event.stopPropagation()}>
+                    {domain.sender_domain && resultAccountId === activeAccount?.id ? (
+                      <button
+                        className={`row-delete-button ${pendingDeleteDomain === domain.sender_domain ? 'confirming' : ''}`}
+                        type="button"
+                        disabled={Boolean(deletingDomain)}
+                        aria-label={
+                          pendingDeleteDomain === domain.sender_domain
+                            ? `Confirm deleting local messages from ${domain.sender_domain}`
+                            : `Delete local messages from ${domain.sender_domain}`
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (pendingDeleteDomain === domain.sender_domain) {
+                            void deleteDomain(domain);
+                          } else {
+                            setPendingDeleteDomain(domain.sender_domain);
+                          }
+                        }}
+                      >
+                        {deletingDomain === domain.sender_domain ? (
+                          <LoaderCircle className="spin" size={13} />
+                        ) : pendingDeleteDomain === domain.sender_domain ? 'Sure?' : (
+                          <Trash2 size={14} />
+                        )}
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
               {!loading && !result.rows.length ? (
-                <tr><td colSpan={4} className="table-empty">No domains match this search.</td></tr>
+                <tr><td colSpan={5} className="table-empty">No domains match this search.</td></tr>
               ) : null}
             </tbody>
           </table>

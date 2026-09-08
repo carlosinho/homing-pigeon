@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Download, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, LoaderCircle, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from '../account-context';
@@ -17,8 +17,13 @@ export function SendersPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<Page<Sender>>({ rows: [], total: 0, page: 1, pageSize: 25 });
+  const [resultAccountId, setResultAccountId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingDeleteSender, setPendingDeleteSender] = useState('');
+  const [deletingSender, setDeletingSender] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const params = useMemo(
     () => ({ search, sortBy, sortDir, page, pageSize: 25 }),
     [page, search, sortBy, sortDir],
@@ -26,6 +31,8 @@ export function SendersPage() {
 
   useEffect(() => {
     if (!activeAccount) return;
+    setResultAccountId(null);
+    setPendingDeleteSender('');
     let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -33,6 +40,7 @@ export function SendersPage() {
         const result = await api.senders(activeAccount.id, params);
         if (!active) return;
         setResult(result);
+        setResultAccountId(activeAccount.id);
         setError('');
       } catch (caught) {
         if (active) {
@@ -46,7 +54,36 @@ export function SendersPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [activeAccount, params]);
+  }, [activeAccount, params, reloadKey]);
+
+  const deleteSender = async (sender: Sender) => {
+    if (
+      !activeAccount ||
+      resultAccountId !== activeAccount.id ||
+      deletingSender ||
+      !sender.sender_email
+    ) return;
+
+    setDeletingSender(sender.sender_email);
+    setError('');
+    setNotice('');
+    try {
+      const { deletedCount } = await api.deleteSender(
+        activeAccount.id,
+        sender.sender_email,
+      );
+      setPendingDeleteSender('');
+      setPage(1);
+      setReloadKey((current) => current + 1);
+      setNotice(
+        `${deletedCount.toLocaleString()} local ${deletedCount === 1 ? 'message' : 'messages'} deleted.`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete local sender messages.');
+    } finally {
+      setDeletingSender('');
+    }
+  };
 
   const toggleSort = (column: 'sender_email' | 'message_count' | 'total_size_bytes') => {
     if (sortBy === column) setSortDir((value) => (value === 'asc' ? 'desc' : 'asc'));
@@ -103,7 +140,8 @@ export function SendersPage() {
             />
           </label>
         </div>
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div className="error-banner" role="alert">{error}</div> : null}
+        {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
         <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
           <table className="sender-table">
             <thead>
@@ -137,6 +175,7 @@ export function SendersPage() {
                     {sortBy === 'message_count' ? sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} /> : null}
                   </button>
                 </th>
+                <th className="row-delete-column"><span className="sr-only">Delete</span></th>
               </tr>
             </thead>
             <tbody>
@@ -159,10 +198,38 @@ export function SendersPage() {
                   </td>
                   <td className="storage-column value">{formatBytes(sender.total_size_bytes)}</td>
                   <td className="count-column value">{sender.message_count.toLocaleString()}</td>
+                  <td className="row-delete-column" onClick={(event) => event.stopPropagation()}>
+                    {sender.sender_email && resultAccountId === activeAccount?.id ? (
+                      <button
+                        className={`row-delete-button ${pendingDeleteSender === sender.sender_email ? 'confirming' : ''}`}
+                        type="button"
+                        disabled={Boolean(deletingSender)}
+                        aria-label={
+                          pendingDeleteSender === sender.sender_email
+                            ? `Confirm deleting local messages from ${sender.sender_email}`
+                            : `Delete local messages from ${sender.sender_email}`
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (pendingDeleteSender === sender.sender_email) {
+                            void deleteSender(sender);
+                          } else {
+                            setPendingDeleteSender(sender.sender_email);
+                          }
+                        }}
+                      >
+                        {deletingSender === sender.sender_email ? (
+                          <LoaderCircle className="spin" size={13} />
+                        ) : pendingDeleteSender === sender.sender_email ? 'Sure?' : (
+                          <Trash2 size={14} />
+                        )}
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
               {!loading && !result.rows.length ? (
-                <tr><td colSpan={5} className="table-empty">No senders match this search.</td></tr>
+                <tr><td colSpan={6} className="table-empty">No senders match this search.</td></tr>
               ) : null}
             </tbody>
           </table>

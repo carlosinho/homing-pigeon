@@ -51,6 +51,21 @@ export const api = {
     request<{ deletedCount: number }>(`/api/accounts/${accountId}/messages`, {
       method: 'DELETE',
     }),
+  deleteMessage: (accountId: number, gmailMessageId: string) =>
+    request<{ deletedCount: number }>(
+      `/api/accounts/${accountId}/messages/${encodeURIComponent(gmailMessageId)}`,
+      { method: 'DELETE' },
+    ),
+  deleteSender: (accountId: number, senderEmail: string) =>
+    request<{ deletedCount: number }>(`/api/accounts/${accountId}/senders`, {
+      method: 'DELETE',
+      body: JSON.stringify({ senderEmail }),
+    }),
+  deleteDomain: (accountId: number, senderDomain: string) =>
+    request<{ deletedCount: number }>(`/api/accounts/${accountId}/domains`, {
+      method: 'DELETE',
+      body: JSON.stringify({ senderDomain }),
+    }),
   jobs: (accountId: number) =>
     request<{ jobs: FetchJob[]; activities: ActivityEvent[] }>(
       `/api/accounts/${accountId}/jobs`,

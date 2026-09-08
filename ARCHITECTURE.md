@@ -39,6 +39,7 @@ In development, Vite serves the browser application on port 5173 and proxies `/a
 10. Disconnecting an account removes local tokens but preserves its account row, messages, and fetch jobs.
 11. The active account in the browser is a UI preference stored under `mailroom.activeAccount` in `localStorage`; it is not an authorization boundary.
 12. Deleting an account's local messages preserves its account, OAuth tokens, and fetch jobs. With the message rows gone, a later fetch can import the same Gmail IDs again.
+13. Row deletion is also local-only: a message action deletes one Gmail message ID, a sender action deletes one exact normalized sender group, and a domain action deletes one exact derived domain group.
 
 ## Startup sequence
 
@@ -110,7 +111,7 @@ Indexes support recent-job lookup, queued-job lookup, received-date ordering, se
 
 ### `activity_events`
 
-This table records successful destructive local-data actions without overloading fetch-job semantics. Each row belongs to an account and stores an event type, affected-item count, and creation time. The current event type is `messages_deleted`. These rows are retained when messages are erased and displayed with fetch jobs in the Fetch screen's Activity list.
+This table records successful destructive local-data actions without overloading fetch-job semantics. Each row belongs to an account and stores an event type, affected-item count, and creation time. The current event type is `messages_deleted`, used for full inventory erasure and message, sender, or domain row actions. These rows are retained when messages are erased and displayed with fetch jobs in the Fetch screen's Activity list.
 
 ## OAuth and account flow
 
@@ -208,6 +209,8 @@ The list endpoint performs a count query and then an offset-based row query. The
 
 `DELETE /api/accounts/:accountId/messages` deletes the complete cumulative inventory for one account, regardless of active UI filters. It returns a conflict while that account has a queued or running fetch so the worker cannot repopulate the inventory during the deletion. The deletion and its activity event are committed in one SQLite transaction. Fetch history and OAuth credentials are preserved.
 
+The related row-action endpoints delete one exact Gmail message ID, all rows for one exact normalized sender email, or all rows whose derived sender domain is an exact match. Unknown sender and domain groups are not exposed as deletion actions in the UI. These endpoints use the same active-fetch conflict rule and transactionally record one `messages_deleted` activity event with the affected row count.
+
 ### Sender queries
 
 Sender endpoints group by the stored `sender_email`; aliases are not merged beyond lowercase normalization. Search is a parameterized `LIKE` against `sender_email`, but unlike message filtering it does not escape `%` or `_`, so those characters act as SQL wildcard patterns.
@@ -230,7 +233,7 @@ React Router defines four routes under a shared `Layout`: `/fetch`, `/messages`,
 
 The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. Messages defaults to estimated size descending and shows attachment metadata; Senders defaults to combined estimated size.
 
-The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized.
+The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized. Message, sender, and domain row deletions require two clicks on the same inline button: the trash icon, then `Sure?`.
 
 CSV downloads are ordinary links to the export endpoints, so the browser handles streaming and file naming.
 

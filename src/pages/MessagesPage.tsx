@@ -78,8 +78,11 @@ export function MessagesPage() {
     page: 1,
     pageSize: 25,
   });
+  const [resultAccountId, setResultAccountId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState('');
+  const [deletingMessageId, setDeletingMessageId] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -91,6 +94,8 @@ export function MessagesPage() {
 
   useEffect(() => {
     if (!activeAccount) return;
+    setResultAccountId(null);
+    setPendingDeleteId('');
     let active = true;
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -98,6 +103,7 @@ export function MessagesPage() {
         const result = await api.messages(activeAccount.id, params);
         if (!active) return;
         setResult(result);
+        setResultAccountId(activeAccount.id);
         setError('');
       } catch (caught) {
         if (active) {
@@ -114,7 +120,12 @@ export function MessagesPage() {
   }, [activeAccount, params, reloadKey]);
 
   const deleteMessages = async () => {
-    if (!activeAccount || deleting) return;
+    if (
+      !activeAccount ||
+      resultAccountId !== activeAccount.id ||
+      deleting ||
+      deletingMessageId
+    ) return;
     const confirmed = window.confirm(
       `Delete all locally stored messages for ${activeAccount.email}?\n\n` +
         'This includes messages hidden by the current filters. Gmail and fetch history will not be changed. A future fetch can import these messages again.',
@@ -122,6 +133,7 @@ export function MessagesPage() {
     if (!confirmed) return;
 
     setDeleting(true);
+    setPendingDeleteId('');
     setError('');
     setNotice('');
     try {
@@ -136,6 +148,35 @@ export function MessagesPage() {
       setError(caught instanceof Error ? caught.message : 'Could not delete local messages.');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const deleteMessage = async (message: Message) => {
+    if (
+      !activeAccount ||
+      resultAccountId !== activeAccount.id ||
+      deleting ||
+      deletingMessageId
+    ) return;
+
+    setDeletingMessageId(message.gmail_message_id);
+    setError('');
+    setNotice('');
+    try {
+      const { deletedCount } = await api.deleteMessage(
+        activeAccount.id,
+        message.gmail_message_id,
+      );
+      setPendingDeleteId('');
+      setPage(1);
+      setReloadKey((current) => current + 1);
+      setNotice(
+        `${deletedCount.toLocaleString()} local ${deletedCount === 1 ? 'message' : 'messages'} deleted.`,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not delete local message.');
+    } finally {
+      setDeletingMessageId('');
     }
   };
 
@@ -192,7 +233,9 @@ export function MessagesPage() {
         title="Messages"
         description=""
         action={
-          activeAccount && (result.total > 0 || result.inventoryTotal > 0) ? (
+          activeAccount &&
+          resultAccountId === activeAccount.id &&
+          (result.total > 0 || result.inventoryTotal > 0) ? (
             <div className="page-actions">
               {result.total > 0 ? (
                 <a className="button" href={api.messagesCsv(activeAccount.id, params)}>
@@ -202,7 +245,7 @@ export function MessagesPage() {
               {result.inventoryTotal > 0 ? (
                 <button
                   className="button button-danger"
-                  disabled={deleting}
+                  disabled={deleting || Boolean(deletingMessageId)}
                   onClick={() => void deleteMessages()}
                 >
                   {deleting ? <LoaderCircle className="spin" size={15} /> : <Trash2 size={15} />}
@@ -280,7 +323,7 @@ export function MessagesPage() {
                     </button>
                   </th>
                 ))}
-                <th className="sticky-action"><span className="sr-only">Open</span></th>
+                <th className="sticky-action"><span className="sr-only">Actions</span></th>
               </tr>
               {filtersOpen ? (
                 <tr className="filter-row">
@@ -334,16 +377,45 @@ export function MessagesPage() {
                     </>
                   ) : null}
                   <td className="sticky-action">
-                    <a
-                      className="icon-button"
-                      href={gmailLink(activeAccount?.email || '', message)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="Open message in Gmail"
-                      title="Open in Gmail"
-                    >
-                      <ExternalLink size={14} />
-                    </a>
+                    <div className="row-actions">
+                      <a
+                        className="icon-button"
+                        href={gmailLink(activeAccount?.email || '', message)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Open message in Gmail"
+                        title="Open in Gmail"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                      <button
+                        className={`row-delete-button ${pendingDeleteId === message.gmail_message_id ? 'confirming' : ''}`}
+                        type="button"
+                        disabled={
+                          resultAccountId !== activeAccount?.id ||
+                          deleting ||
+                          Boolean(deletingMessageId)
+                        }
+                        aria-label={
+                          pendingDeleteId === message.gmail_message_id
+                            ? 'Confirm deleting this local message'
+                            : 'Delete this local message'
+                        }
+                        onClick={() => {
+                          if (pendingDeleteId === message.gmail_message_id) {
+                            void deleteMessage(message);
+                          } else {
+                            setPendingDeleteId(message.gmail_message_id);
+                          }
+                        }}
+                      >
+                        {deletingMessageId === message.gmail_message_id ? (
+                          <LoaderCircle className="spin" size={13} />
+                        ) : pendingDeleteId === message.gmail_message_id ? 'Sure?' : (
+                          <Trash2 size={14} />
+                        )}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

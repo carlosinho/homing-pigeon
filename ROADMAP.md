@@ -24,8 +24,15 @@ Working local POC (`v0.10`) — Gmail connection, restart-safe inventory fetches
 - [x] Local data protections — Bind to loopback, exclude local secrets/data from Git, use restrictive POSIX modes, and validate API inputs.
 - [x] Focused automated coverage — Test parsing helpers, domain grouping, and empty-domain message filtering with Vitest.
 
-### v0.10 — Actual MVP
+### v0.20 — Actual MVP
 
+- [x] Simple delete button next to each row in the Messages, Senders, Domains screens.
+  - The delete in Messages just deletes that given message from the app's database.
+  - The delete in Senders deletes all messages from that specific sender from the app's database.
+  - The delete in Domains deletes all messages from that specific domain name from the app's database.
+  - Unknown sender and Unknown domain rows do not offer delete actions.
+  - No sync with actual Gmail. This is just deleting from the app.
+  - Simple confirmation UI: the trash button changes to "Sure?" and must be clicked again to delete.
 - [ ] Add simple login like in OpenShelf.
 
 ### Backlog / future

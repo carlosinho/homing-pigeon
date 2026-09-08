@@ -22,7 +22,7 @@ The app requests headers, size estimates, and MIME metadata, but excludes messag
 
 The inventory is cumulative for each account. A completed fetch adds new messages to that account's existing inventory; the Messages and Senders screens are not limited to the results of one particular fetch.
 
-The Messages screen can delete all locally stored messages for the selected account. This does not change Gmail, connected accounts, or fetch history. A later fetch can import the same messages again. Successful erases appear alongside fetches in the Fetch screen's Activity list.
+The Messages screen can delete one locally stored message or all messages for the selected account. The Senders and Domains screens can delete all local messages in a selected sender or domain group; Unknown sender and Unknown domain groups do not offer this action. Row deletions use an inline two-click confirmation. None of these actions change Gmail, connected accounts, or fetch history, and a later fetch can import the same messages again. Successful erases appear alongside fetches in the Fetch screen's Activity list.
 
 ## Main flows
 
@@ -52,7 +52,7 @@ If the process stops during a fetch, that job is returned to the queue on the ne
 
 ### 3. Browse messages
 
-The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. It defaults to largest messages first and shows message size plus expandable attachment metadata. **More columns** reveals the RFC message ID, Gmail search, Gmail message ID, and thread ID. The external-link action opens a Gmail search for the selected message.
+The Messages screen provides server-side pagination, sorting on every stored field, sender/subject search, and per-column substring filters. It defaults to largest messages first and shows message size plus expandable attachment metadata. **More columns** reveals the RFC message ID, Gmail search, Gmail message ID, and thread ID. Row actions open a Gmail search or delete that message from the local inventory.
 
 The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` representation in SQLite, while dates displayed in the browser use the browser's local timezone.
 
@@ -200,6 +200,9 @@ The React client uses these endpoints directly. There is no separate API authent
 | `GET` | `/api/auth/google/callback` | Exchange Google's authorization code, upsert the account by email, and redirect to `/fetch`. |
 | `POST` | `/api/accounts/:accountId/disconnect` | Clear local OAuth tokens while retaining messages and jobs. |
 | `DELETE` | `/api/accounts/:accountId/messages` | Delete all locally stored messages for the account. Returns 409 while the account has a queued or running fetch. |
+| `DELETE` | `/api/accounts/:accountId/messages/:gmailMessageId` | Delete one locally stored message. |
+| `DELETE` | `/api/accounts/:accountId/senders` | Delete all local messages for the exact `senderEmail` in the JSON body. |
+| `DELETE` | `/api/accounts/:accountId/domains` | Delete all local messages for the exact `senderDomain` in the JSON body. |
 | `POST` | `/api/accounts/:accountId/jobs` | Queue a fetch. JSON body: `{ "query": "in:inbox older:1y" }`. Queries must contain 1–1,000 characters after trimming. |
 | `GET` | `/api/accounts/:accountId/jobs` | Return recent fetch jobs and local-data activity for the account. |
 | `POST` | `/api/jobs/:jobId/retry` | Move a failed job back to `queued`. Returns 409 for a job not currently failed. |

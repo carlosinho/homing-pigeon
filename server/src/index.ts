@@ -27,6 +27,9 @@ app.use(express.json({ limit: '32kb' }));
 
 const idSchema = z.coerce.number().int().positive();
 const jobSchema = z.object({ query: z.string().trim().min(1).max(1_000) });
+const messageIdSchema = z.string().trim().min(1);
+const senderDeleteSchema = z.object({ senderEmail: z.string().trim().min(1) });
+const domainDeleteSchema = z.object({ senderDomain: z.string().trim().min(1) });
 
 function messageResponseRow(row: Record<string, unknown>) {
   const { attachments_json: attachmentsJson, ...message } = row;
@@ -34,6 +37,51 @@ function messageResponseRow(row: Record<string, unknown>) {
     ...message,
     attachments: JSON.parse(String(attachmentsJson || '[]')) as unknown[],
   };
+}
+
+function canDeleteStoredMessages(
+  accountId: number,
+  response: express.Response,
+): boolean {
+  if (!getAccount(accountId)) {
+    response.status(404).json({ error: 'Account not found.' });
+    return false;
+  }
+
+  const activeJob = db
+    .prepare(
+      `SELECT 1 FROM fetch_jobs
+       WHERE account_id = ? AND status IN ('queued', 'running') LIMIT 1`,
+    )
+    .get(accountId);
+  if (activeJob) {
+    response.status(409).json({
+      error: 'Wait for this mailbox\'s active fetches to finish before deleting its messages.',
+    });
+    return false;
+  }
+
+  return true;
+}
+
+function deleteStoredMessages(
+  accountId: number,
+  predicateSql = '',
+  values: string[] = [],
+): number {
+  return db.transaction(() => {
+    const predicate = predicateSql ? ` AND ${predicateSql}` : '';
+    const result = db
+      .prepare(`DELETE FROM messages WHERE account_id = ?${predicate}`)
+      .run(accountId, ...values);
+    if (result.changes) {
+      db.prepare(
+        `INSERT INTO activity_events (account_id, event_type, item_count)
+         VALUES (?, 'messages_deleted', ?)`,
+      ).run(accountId, result.changes);
+    }
+    return result.changes;
+  })();
 }
 
 app.get('/api/health', (_request, response) => {
@@ -96,36 +144,48 @@ app.post('/api/accounts/:accountId/disconnect', (request, response) => {
 
 app.delete('/api/accounts/:accountId/messages', (request, response) => {
   const accountId = idSchema.parse(request.params.accountId);
-  if (!getAccount(accountId)) {
-    response.status(404).json({ error: 'Account not found.' });
-    return;
-  }
+  if (!canDeleteStoredMessages(accountId, response)) return;
 
-  const activeJob = db
-    .prepare(
-      `SELECT 1 FROM fetch_jobs
-       WHERE account_id = ? AND status IN ('queued', 'running') LIMIT 1`,
-    )
-    .get(accountId);
-  if (activeJob) {
-    response.status(409).json({
-      error: 'Wait for this mailbox\'s active fetches to finish before deleting its messages.',
-    });
-    return;
-  }
+  const deletedCount = deleteStoredMessages(accountId);
+  response.json({ deletedCount });
+});
 
-  const deletedCount = db.transaction(() => {
-    const result = db
-      .prepare('DELETE FROM messages WHERE account_id = ?')
-      .run(accountId);
-    if (result.changes) {
-      db.prepare(
-        `INSERT INTO activity_events (account_id, event_type, item_count)
-         VALUES (?, 'messages_deleted', ?)`,
-      ).run(accountId, result.changes);
-    }
-    return result.changes;
-  })();
+app.delete('/api/accounts/:accountId/messages/:gmailMessageId', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const gmailMessageId = messageIdSchema.parse(request.params.gmailMessageId);
+  if (!canDeleteStoredMessages(accountId, response)) return;
+
+  const deletedCount = deleteStoredMessages(
+    accountId,
+    'gmail_message_id = ?',
+    [gmailMessageId],
+  );
+  response.json({ deletedCount });
+});
+
+app.delete('/api/accounts/:accountId/senders', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const { senderEmail } = senderDeleteSchema.parse(request.body);
+  if (!canDeleteStoredMessages(accountId, response)) return;
+
+  const deletedCount = deleteStoredMessages(
+    accountId,
+    'sender_email = ?',
+    [senderEmail.toLowerCase()],
+  );
+  response.json({ deletedCount });
+});
+
+app.delete('/api/accounts/:accountId/domains', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const { senderDomain } = domainDeleteSchema.parse(request.body);
+  if (!canDeleteStoredMessages(accountId, response)) return;
+
+  const deletedCount = deleteStoredMessages(
+    accountId,
+    `${senderDomainSql} = ?`,
+    [senderDomain.toLowerCase()],
+  );
   response.json({ deletedCount });
 });
 
