@@ -67,6 +67,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL,
+    target TEXT NOT NULL DEFAULT '',
     item_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -86,6 +87,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_account_size
     ON messages(account_id, size_bytes DESC);
 `);
+
+const activityEventColumns = db
+  .prepare('PRAGMA table_info(activity_events)')
+  .all() as Array<{ name: string }>;
+if (!activityEventColumns.some((column) => column.name === 'target')) {
+  db.exec("ALTER TABLE activity_events ADD COLUMN target TEXT NOT NULL DEFAULT ''");
+}
 
 db.prepare(
   `UPDATE fetch_jobs

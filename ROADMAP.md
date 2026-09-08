@@ -54,7 +54,7 @@
 - OAuth tokens are plaintext in SQLite and the API has no login, request authorization, origin validation, or explicit CSRF protection; operation is intentionally loopback-only.
 - OAuth state is process-local, so restarting the backend invalidates an authorization flow already in progress.
 - Disconnecting an account does not stop an OAuth client already used by a running job; a later refresh may fail after tokens are cleared.
-- Startup uses `CREATE TABLE IF NOT EXISTS`; it cannot upgrade an older schema when columns or constraints change.
+- Startup uses `CREATE TABLE IF NOT EXISTS` and has no general migration runner; only the activity-event target column currently has an explicit compatibility upgrade.
 - Account-scoped read routes return empty results for unknown account IDs, and unmatched built-deployment GET requests may return the React application instead of JSON 404.
 - `REQUEST_DELAY_MS` is not checked for a finite, non-negative value.
 - Automated tests cover only parsers plus minimal domain-query behavior; most API, worker, OAuth, CSV, database, and browser behavior needs manual verification.

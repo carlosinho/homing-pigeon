@@ -28,6 +28,25 @@ function statusLabel(status: FetchJob['status']) {
   }[status];
 }
 
+function activityLabel(event: ActivityEvent) {
+  switch (event.event_type) {
+    case 'message_deleted':
+      return { title: 'Local message deleted', status: 'Delete' };
+    case 'sender_messages_deleted':
+      return {
+        title: `All messages from ${event.target} deleted`,
+        status: 'Sender',
+      };
+    case 'domain_messages_deleted':
+      return {
+        title: `All messages from domain ${event.target} deleted`,
+        status: 'Domain',
+      };
+    default:
+      return { title: 'Local message inventory erased', status: 'Erase' };
+  }
+}
+
 export function FetchPage() {
   const {
     activeAccount,
@@ -278,13 +297,14 @@ export function FetchPage() {
             activity.map((entry) => {
               if (entry.kind === 'event') {
                 const event = entry.item;
+                const label = activityLabel(event);
                 return (
                   <article className="history-row" key={`event-${event.id}`}>
                     <div className="history-query">
-                      <strong className="value">Local message inventory erased</strong>
+                      <strong className="value" title={label.title}>{label.title}</strong>
                       <span className="value">{new Date(`${event.created_at}Z`).toLocaleString()}</span>
                     </div>
-                    <span className="status completed">Erase</span>
+                    <span className="status completed">{label.status}</span>
                     <span className="history-count value">
                       {event.item_count.toLocaleString()} deleted
                     </span>

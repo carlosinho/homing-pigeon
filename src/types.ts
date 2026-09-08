@@ -24,7 +24,12 @@ export type FetchJob = {
 export type ActivityEvent = {
   id: number;
   account_id: number;
-  event_type: 'messages_deleted';
+  event_type:
+    | 'messages_deleted'
+    | 'message_deleted'
+    | 'sender_messages_deleted'
+    | 'domain_messages_deleted';
+  target: string;
   item_count: number;
   created_at: string;
 };

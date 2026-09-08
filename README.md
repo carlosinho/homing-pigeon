@@ -22,7 +22,7 @@ The app requests headers, size estimates, and MIME metadata, but excludes messag
 
 The inventory is cumulative for each account. A completed fetch adds new messages to that account's existing inventory; the Messages and Senders screens are not limited to the results of one particular fetch.
 
-The Messages screen can delete one locally stored message or all messages for the selected account. The Senders and Domains screens can delete all local messages in a selected sender or domain group; Unknown sender and Unknown domain groups do not offer this action. Row deletions use an inline two-click confirmation. None of these actions change Gmail, connected accounts, or fetch history, and a later fetch can import the same messages again. Successful erases appear alongside fetches in the Fetch screen's Activity list.
+The Messages screen can delete one locally stored message or all messages for the selected account. The Senders and Domains screens can delete all local messages in a selected sender or domain group; Unknown sender and Unknown domain groups do not offer this action. Row deletions use an inline two-click confirmation. None of these actions change Gmail, connected accounts, or fetch history, and a later fetch can import the same messages again. Each successful action appears with its specific message, sender, domain, or full-inventory label alongside fetches in the Fetch screen's Activity list.
 
 ## Main flows
 

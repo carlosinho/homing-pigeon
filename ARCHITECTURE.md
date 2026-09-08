@@ -49,11 +49,12 @@ Importing `server/src/database.ts` performs database initialization:
 2. Open `.data/mailroom.db` with `better-sqlite3` and request mode `0600` for the main file.
 3. Enable WAL journal mode and SQLite foreign keys.
 4. Run `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements.
-5. Change every job still marked `running` to `queued` and attach the message `The app stopped before this fetch finished.`.
-6. Start Express on `127.0.0.1` using `PORT`.
-7. Call `wakeWorker()`, which processes any recovered or previously queued jobs.
+5. Add the `activity_events.target` column when opening a database created before differentiated deletion events were introduced.
+6. Change every job still marked `running` to `queued` and attach the message `The app stopped before this fetch finished.`.
+7. Start Express on `127.0.0.1` using `PORT`.
+8. Call `wakeWorker()`, which processes any recovered or previously queued jobs.
 
-There is no schema-version table or migration runner. `CREATE TABLE IF NOT EXISTS` creates a fresh database but will not evolve an older table when columns or constraints change.
+There is no schema-version table or general migration runner. `CREATE TABLE IF NOT EXISTS` creates a fresh database but will not evolve older tables; the activity target column is handled by one explicit compatibility check.
 
 ## Persistence model
 
@@ -111,7 +112,7 @@ Indexes support recent-job lookup, queued-job lookup, received-date ordering, se
 
 ### `activity_events`
 
-This table records successful destructive local-data actions without overloading fetch-job semantics. Each row belongs to an account and stores an event type, affected-item count, and creation time. The current event type is `messages_deleted`, used for full inventory erasure and message, sender, or domain row actions. These rows are retained when messages are erased and displayed with fetch jobs in the Fetch screen's Activity list.
+This table records successful destructive local-data actions without overloading fetch-job semantics. Each row belongs to an account and stores an event type, optional target, affected-item count, and creation time. `messages_deleted` represents a full inventory wipe, `message_deleted` one message, `sender_messages_deleted` one aggregated sender deletion, and `domain_messages_deleted` one aggregated domain deletion. Sender and domain events store the normalized sender or domain in `target`. These rows are retained when messages are erased and displayed with action-specific labels alongside fetch jobs in the Fetch screen's Activity list.
 
 ## OAuth and account flow
 
@@ -209,7 +210,7 @@ The list endpoint performs a count query and then an offset-based row query. The
 
 `DELETE /api/accounts/:accountId/messages` deletes the complete cumulative inventory for one account, regardless of active UI filters. It returns a conflict while that account has a queued or running fetch so the worker cannot repopulate the inventory during the deletion. The deletion and its activity event are committed in one SQLite transaction. Fetch history and OAuth credentials are preserved.
 
-The related row-action endpoints delete one exact Gmail message ID, all rows for one exact normalized sender email, or all rows whose derived sender domain is an exact match. Unknown sender and domain groups are not exposed as deletion actions in the UI. These endpoints use the same active-fetch conflict rule and transactionally record one `messages_deleted` activity event with the affected row count.
+The related row-action endpoints delete one exact Gmail message ID, all rows for one exact normalized sender email, or all rows whose derived sender domain is an exact match. Unknown sender and domain groups are not exposed as deletion actions in the UI. These endpoints use the same active-fetch conflict rule and transactionally record one action-specific activity event with the affected row count. Sender and domain deletions create one aggregate event rather than one event per deleted message.
 
 ### Sender queries
 

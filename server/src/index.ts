@@ -68,6 +68,8 @@ function deleteStoredMessages(
   accountId: number,
   predicateSql = '',
   values: string[] = [],
+  eventType = 'messages_deleted',
+  target = '',
 ): number {
   return db.transaction(() => {
     const predicate = predicateSql ? ` AND ${predicateSql}` : '';
@@ -76,9 +78,10 @@ function deleteStoredMessages(
       .run(accountId, ...values);
     if (result.changes) {
       db.prepare(
-        `INSERT INTO activity_events (account_id, event_type, item_count)
-         VALUES (?, 'messages_deleted', ?)`,
-      ).run(accountId, result.changes);
+        `INSERT INTO activity_events
+           (account_id, event_type, target, item_count)
+         VALUES (?, ?, ?, ?)`,
+      ).run(accountId, eventType, target, result.changes);
     }
     return result.changes;
   })();
@@ -159,6 +162,7 @@ app.delete('/api/accounts/:accountId/messages/:gmailMessageId', (request, respon
     accountId,
     'gmail_message_id = ?',
     [gmailMessageId],
+    'message_deleted',
   );
   response.json({ deletedCount });
 });
@@ -172,6 +176,8 @@ app.delete('/api/accounts/:accountId/senders', (request, response) => {
     accountId,
     'sender_email = ?',
     [senderEmail.toLowerCase()],
+    'sender_messages_deleted',
+    senderEmail.toLowerCase(),
   );
   response.json({ deletedCount });
 });
@@ -185,6 +191,8 @@ app.delete('/api/accounts/:accountId/domains', (request, response) => {
     accountId,
     `${senderDomainSql} = ?`,
     [senderDomain.toLowerCase()],
+    'domain_messages_deleted',
+    senderDomain.toLowerCase(),
   );
   response.json({ deletedCount });
 });
@@ -218,9 +226,9 @@ app.get('/api/accounts/:accountId/jobs', (request, response) => {
     .all(accountId);
   const activities = db
     .prepare(
-      `SELECT id, account_id, event_type, item_count, created_at
+      `SELECT id, account_id, event_type, target, item_count, created_at
        FROM activity_events
-       WHERE account_id = ? AND event_type = 'messages_deleted'
+       WHERE account_id = ?
        ORDER BY id DESC LIMIT 12`,
     )
     .all(accountId);
