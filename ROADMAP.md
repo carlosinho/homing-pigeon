@@ -1,9 +1,5 @@
 # Development roadmap
 
-## Status
-
-Working local POC (`v0.10`) — Gmail connection, restart-safe inventory fetches, account-scoped analysis, CSV export, and local inventory erasure are implemented.
-
 ## Roadmap
 
 ### v0.10 — Working local POC
@@ -34,6 +30,7 @@ Working local POC (`v0.10`) — Gmail connection, restart-safe inventory fetches
   - No sync with actual Gmail. This is just deleting from the app.
   - Simple confirmation UI: the trash button changes to "Sure?" and must be clicked again to delete.
 - [ ] Add simple login like in OpenShelf.
+- [ ] Add version numbering with one source of truth like in my other apps.
 
 ### Backlog / future
 

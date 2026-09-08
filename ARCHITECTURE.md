@@ -233,7 +233,7 @@ React Router defines four routes under a shared `Layout`: `/fetch`, `/messages`,
 
 The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. Messages defaults to estimated size descending and shows attachment metadata; Senders defaults to combined estimated size.
 
-The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized. Message, sender, and domain row deletions require two clicks on the same inline button: the trash icon, then `Sure?`.
+The Senders-to-Messages drill-down is implemented as `/messages?sender_email=<address>`. The external-link action beside a sender opens Gmail in a new tab with a `from:<sender>` search and stops the surrounding row click from navigating locally. Domains uses `/messages?sender_domain=<domain>` and displays a removable active-domain indicator on the Messages screen. These query parameters are read when the component state is initialized. Message, sender, and domain row deletions require two clicks on the same inline button: the trash icon, then `Sure?`.
 
 CSV downloads are ordinary links to the export endpoints, so the browser handles streaming and file naming.
 

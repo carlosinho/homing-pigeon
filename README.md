@@ -58,7 +58,7 @@ The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` represen
 
 ### 4. Rank senders and domains
 
-The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the greatest combined message size and also shows message count. Selecting a sender opens the Messages screen with that sender filter applied.
+The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the greatest combined message size and also shows message count. Selecting a sender opens the Messages screen with that sender filter applied. The external-link action beside an address opens a new Gmail tab with a `from:<sender>` search.
 
 The Domains screen derives the portion after `@` from each normalized sender email and groups messages by that domain. Sender values without a domain are grouped under Unknown domain. Selecting a domain opens the Messages screen with an exact domain filter applied.
 

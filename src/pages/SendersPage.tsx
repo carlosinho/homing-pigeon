@@ -1,4 +1,12 @@
-import { ArrowDown, ArrowUp, Download, LoaderCircle, Search, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Download,
+  ExternalLink,
+  LoaderCircle,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from '../account-context';
@@ -8,6 +16,10 @@ import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
 import { formatBytes } from '../formats';
 import type { Page, Sender } from '../types';
+
+function gmailSenderLink(email: string, senderEmail: string) {
+  return `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(email)}#search/${encodeURIComponent(`from:${senderEmail}`)}`;
+}
 
 export function SendersPage() {
   const { activeAccount, accounts } = useAccount();
@@ -188,7 +200,24 @@ export function SendersPage() {
                   <td className="rank-column value">
                     {String((page - 1) * result.pageSize + index + 1).padStart(2, '0')}
                   </td>
-                  <td className="sender-cell">{sender.sender_email || 'Unknown sender'}</td>
+                  <td className="sender-cell">
+                    <span className="sender-with-action">
+                      <span>{sender.sender_email || 'Unknown sender'}</span>
+                      {sender.sender_email && resultAccountId === activeAccount?.id ? (
+                        <a
+                          className="icon-button sender-gmail-link"
+                          href={gmailSenderLink(activeAccount?.email || '', sender.sender_email)}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Search Gmail for messages from ${sender.sender_email}`}
+                          title="Search sender in Gmail"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      ) : null}
+                    </span>
+                  </td>
                   <td className="volume-column">
                     <span
                       className="volume"
