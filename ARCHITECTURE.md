@@ -1,6 +1,6 @@
 # Homing Pigeon architecture
 
-This document describes the code that currently runs. Future ideas are isolated at the end and are not architectural claims about the present implementation.
+This document describes the code that currently runs. Planned work is tracked in [ROADMAP.md](./ROADMAP.md).
 
 ## System design philosophy
 
@@ -317,16 +317,3 @@ There are no automated tests for OAuth, Gmail requests, retry timing, worker rec
 `legacy/code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
 
 Dependency versions are recorded in `package-lock.json`. The backend and frontend share one root package rather than separate workspaces.
-
-## Future architecture changes
-
-Possible additions should preserve the account/message uniqueness invariant but may require explicit schema migrations:
-
-- Add a `fetch_job_messages` join table if per-fetch snapshots or query-specific result views are needed.
-- Persist list cursors or per-message work items if restarts must resume near the interruption point instead of replaying a query.
-- Move work to a durable external queue before running multiple API replicas.
-- Introduce per-account scheduling and rate limits before parallelizing account fetches.
-- Add FTS or a search service and cursor pagination when offset/`LIKE` performance becomes material.
-- Separate encrypted credentials from analytical data before supporting remote hosting.
-- Add an authenticated user/account ownership model before exposing the API beyond loopback.
-- Add mutation-specific authorization, confirmation, and audit models before any archive, label, trash, delete, or unsubscribe feature.

@@ -1,0 +1,60 @@
+# Development roadmap
+
+## Status
+
+Working local POC (`v0.10`) — Gmail connection, restart-safe inventory fetches, account-scoped analysis, CSV export, and local inventory erasure are implemented.
+
+## Roadmap
+
+### v0.10 — Working local POC
+
+- [x] Local React and Express application — Vite serves development; Express serves the built UI and loopback API.
+- [x] Google OAuth connection — Request read-only Gmail access and persist refreshed credentials in local SQLite.
+- [x] Multiple Gmail accounts — Connect, select, reconnect, and disconnect accounts while retaining each account's inventory and history.
+- [x] Gmail-query fetch jobs — Queue any validated Gmail search and enumerate matching messages in pages of up to 500.
+- [x] Durable, idempotent ingestion — Uniqueness per account and Gmail message ID prevents duplicates; interrupted jobs requeue on startup.
+- [x] Throttling and retries — Serialize Gmail calls, apply a configurable delay, and retry temporary quota or server failures with backoff.
+- [x] Metadata-only inventory — Store sender, subject, dates, Gmail and RFC IDs, estimated size, and attachment metadata without bodies or files.
+- [x] Fetch activity and retry UI — Show progress and recent history, surface failures, and allow failed jobs to be requeued.
+- [x] Message browser — Provide server-side search, per-column filters, sorting, pagination, attachment details, and Gmail deep links.
+- [x] Sender analysis — Rank normalized senders by message count and combined size, with drill-down to matching messages.
+- [x] Domain analysis — Rank derived sender domains by message count, including unknown domains, with exact-filter drill-down.
+- [x] Complete filtered CSV exports — Export message, sender, and domain results with stable sorting and spreadsheet-injection protection.
+- [x] Account-scoped inventory erasure — Delete local message rows transactionally, preserve accounts and jobs, and record the activity.
+- [x] Local data protections — Bind to loopback, exclude local secrets/data from Git, use restrictive POSIX modes, and validate API inputs.
+- [x] Focused automated coverage — Test parsing helpers, domain grouping, and empty-domain message filtering with Vitest.
+
+### v0.10 — Actual MVP
+
+- [ ] Add simple login like in OpenShelf.
+
+### Backlog / future
+
+- [ ] Gmail message actions — Add archive, label, trash, delete, or unsubscribe workflows with the required scope, confirmations, authorization, and audit trail.
+- [ ] Fetch controls — Add pause and cancel behavior for queued and running jobs.
+- [ ] Durable fetch checkpoints — Persist page cursors or per-message work so interrupted jobs resume near their last position.
+- [ ] Large-search splitting — Automatically divide very large Gmail searches into date ranges.
+- [ ] Inventory synchronization — Refresh stored metadata and remove local rows for Gmail deletions or messages that no longer match.
+- [ ] Additional message metadata — Store fields such as labels, sender display names, and `List-Unsubscribe`.
+- [ ] Higher-throughput ingestion — Evaluate batched metadata requests and controlled concurrency; add per-account scheduling and rate limits first.
+- [ ] Durable multi-replica jobs — Move background work to an external queue before running multiple API replicas.
+- [ ] Remote or multi-user deployment — Add authenticated ownership boundaries, encrypted credential separation, TLS, CSRF defenses, deliberate network binding, and monitoring.
+
+## Known issues / tech debt
+
+- Restart recovery replays a query from its first page because Gmail page tokens and per-message work are not persisted.
+- One in-process worker and one process-wide rate limiter serialize all accounts; restarting the API also stops active Gmail work.
+- New messages require individual `messages.get` calls; there is no batching or controlled concurrency.
+- SQLite offset pagination, substring `LIKE` filters, and on-demand sender/domain grouping will become slower on large inventories.
+- Sender and domain search treat `%` and `_` as SQL wildcards, unlike message column filters, which escape them.
+- OAuth tokens are plaintext in SQLite and the API has no login, request authorization, origin validation, or explicit CSRF protection; operation is intentionally loopback-only.
+- OAuth state is process-local, so restarting the backend invalidates an authorization flow already in progress.
+- Disconnecting an account does not stop an OAuth client already used by a running job; a later refresh may fail after tokens are cleared.
+- Startup uses `CREATE TABLE IF NOT EXISTS`; it cannot upgrade an older schema when columns or constraints change.
+- Account-scoped read routes return empty results for unknown account IDs, and unmatched built-deployment GET requests may return the React application instead of JSON 404.
+- `REQUEST_DELAY_MS` is not checked for a finite, non-negative value.
+- Automated tests cover only parsers plus minimal domain-query behavior; most API, worker, OAuth, CSV, database, and browser behavior needs manual verification.
+
+## Decisions pending
+
+- TBD

@@ -145,7 +145,7 @@ npm start
 
 Open [http://localhost:3001](http://localhost:3001). The Express process serves the compiled React application and API from the same loopback origin.
 
-If the port or hostname changes, update `PORT`, `APP_URL`, `GOOGLE_REDIRECT_URI`, and the authorized redirect URI in Google Cloud together. Remote deployment would additionally require an application authentication layer, TLS, CSRF protection, different token storage, and a deliberate network binding; those are not implemented.
+If the port or hostname changes, update `PORT`, `APP_URL`, `GOOGLE_REDIRECT_URI`, and the authorized redirect URI in Google Cloud together. Remote deployment is not supported by the current security model.
 
 ## Local data and reset
 
@@ -185,6 +185,8 @@ To reset Homing Pigeon completely, stop the backend and remove `.data/`. This re
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for job semantics, data-model details, retry behavior, and current scaling boundaries.
+
+See [ROADMAP.md](./ROADMAP.md) for shipped milestones, the development backlog, known issues, and pending decisions.
 
 ## HTTP API
 
@@ -231,20 +233,3 @@ Domain list and CSV parameters:
 - `sortBy`: `sender_domain` or `message_count`; defaults to `message_count`
 - `sortDir`: `asc` or `desc`
 - `page` and `pageSize`: list endpoint only, with the same bounds as messages
-
-## Possible next versions
-
-These features were discussed or are natural continuations, but none exists in the current code:
-
-- Archive, label, trash, delete actions. These would require `gmail.modify`, explicit confirmation, and an audit trail.
-- Pause or cancel controls for queued and running jobs.
-- Per-fetch result snapshots and filtering. The current inventory is cumulative by account and has no job-to-message join table.
-- Durable Gmail page-token checkpoints. Restarted jobs currently enumerate their query again from page one.
-- Automatic date-range splitting for very large searches.
-- Refreshing previously stored messages or removing local rows when messages are deleted or no longer match a Gmail query.
-- Additional headers or metadata such as labels, sender display names, and `List-Unsubscribe`.
-- UI controls to delete an account and its local data or revoke the OAuth grant at Google.
-- Full-text search, cursor pagination, batched metadata requests, or concurrent per-account workers for larger datasets.
-- Versioned database migrations. The current schema is created with `CREATE TABLE IF NOT EXISTS` statements at startup.
-- Remote or multi-user deployment, including login, authorization boundaries, encrypted token storage, TLS, and operational monitoring.
-- API, worker, OAuth, database, and browser-level automated tests. The current tests cover only the parsing helpers.
