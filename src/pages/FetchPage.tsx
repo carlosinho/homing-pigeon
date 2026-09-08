@@ -132,7 +132,7 @@ export function FetchPage() {
     ...activities.map((event) => ({ kind: 'event' as const, item: event })),
   ]
     .sort((left, right) => right.item.created_at.localeCompare(left.item.created_at))
-    .slice(0, 12);
+    .slice(0, 20);
 
   const startFetch = async () => {
     if (!activeAccount || !query.trim()) return;

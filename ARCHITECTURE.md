@@ -87,7 +87,7 @@ OAuth credentials live on the account row so multiple Gmail accounts can coexist
 | `error` | Human-readable failure or recovery message. Cleared when processing starts. |
 | `created_at`, `started_at`, `completed_at` | SQLite UTC timestamps. `started_at` is overwritten when a job runs again. |
 
-The API reads the 12 newest jobs and 12 newest local-data events for the active account. The UI merges them chronologically and displays the 12 newest activity entries. Older rows remain in the database.
+The API reads the 20 newest jobs and 20 newest local-data events for the active account. The UI merges them chronologically and displays the 20 newest activity entries. Older rows remain in the database.
 
 ### `messages`
 

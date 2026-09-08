@@ -221,7 +221,7 @@ app.get('/api/accounts/:accountId/jobs', (request, response) => {
   const jobs = db
     .prepare(
       `SELECT * FROM fetch_jobs
-       WHERE account_id = ? ORDER BY id DESC LIMIT 12`,
+       WHERE account_id = ? ORDER BY id DESC LIMIT 20`,
     )
     .all(accountId);
   const activities = db
@@ -229,7 +229,7 @@ app.get('/api/accounts/:accountId/jobs', (request, response) => {
       `SELECT id, account_id, event_type, target, item_count, created_at
        FROM activity_events
        WHERE account_id = ?
-       ORDER BY id DESC LIMIT 12`,
+       ORDER BY id DESC LIMIT 20`,
     )
     .all(accountId);
   response.json({ jobs, activities });
