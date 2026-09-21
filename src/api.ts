@@ -1,5 +1,7 @@
 import type {
   Account,
+  ClassificationJob,
+  ClassificationStatus,
   ActivityEvent,
   Domain,
   FetchJob,
@@ -42,6 +44,15 @@ export function queryString(
 }
 
 export const api = {
+  eraseClassifications: () =>
+    request<{ erasedCount: number }>('/api/classifications', { method: 'DELETE' }),
+  classification: (accountId: number) =>
+    request<ClassificationStatus>(`/api/accounts/${accountId}/classification`),
+  classifyMessages: (accountId: number, messageIds?: string[]) =>
+    request<ClassificationJob>(`/api/accounts/${accountId}/classification`, {
+      method: 'POST',
+      body: JSON.stringify(messageIds ? { messageIds } : {}),
+    }),
   authStatus: () =>
     request<{ configured: boolean; accounts: Account[] }>('/api/auth/status'),
   authorizationUrl: () => request<{ url: string }>('/api/auth/google/start'),

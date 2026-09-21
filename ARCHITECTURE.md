@@ -33,7 +33,7 @@ In development, Vite serves the browser application on port 5173 and proxies `/a
 4. Every fetch job belongs to one account, but there is no relationship between individual jobs and message rows.
 5. Existing message rows are never refreshed during a fetch. A matching Gmail ID increments `skipped_count` and bypasses `messages.get`.
 6. The Messages, Senders, and Domains APIs always query the cumulative inventory for an account, regardless of which query originally found a message.
-7. Exactly one in-process worker loop may be active. It processes queued jobs serially across all accounts.
+7. Exactly one Gmail worker loop may be active. It processes queued fetch jobs serially across all accounts; classification has its own serial loop.
 8. Gmail calls inside a job are sequential and share one process-wide minimum request delay.
 9. The implementation requests headers, message-size estimates, and MIME metadata through a partial response that excludes body and attachment data.
 10. Disconnecting an account removes local tokens but preserves its account row, messages, and fetch jobs.
@@ -49,12 +49,12 @@ Importing `server/src/database.ts` performs database initialization:
 2. Open `.data/mailroom.db` with `better-sqlite3` and request mode `0600` for the main file.
 3. Enable WAL journal mode and SQLite foreign keys.
 4. Run `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements.
-5. Add the `activity_events.target` column when opening a database created before differentiated deletion events were introduced.
-6. Change every job still marked `running` to `queued` and attach the message `The app stopped before this fetch finished.`.
+5. Add missing `activity_events.target` and `messages.category` columns for older databases; create the unclassified-message index after adding the category column.
+6. Change every fetch job still marked `running` to `queued` and attach the message `The app stopped before this fetch finished.`. Also requeue interrupted classification jobs.
 7. Start Express on `127.0.0.1` using `PORT`.
-8. Call `wakeWorker()`, which processes any recovered or previously queued jobs.
+8. Call `wakeWorker()`, which processes any recovered or previously queued fetch jobs. Resume queued classification jobs through a separate serial worker when a TypeSafe API key is configured.
 
-There is no schema-version table or general migration runner. `CREATE TABLE IF NOT EXISTS` creates a fresh database but will not evolve older tables; the activity target column is handled by one explicit compatibility check.
+There is no schema-version table or general migration runner. `CREATE TABLE IF NOT EXISTS` creates a fresh database but will not evolve older tables; the activity target and message category columns use explicit compatibility checks.
 
 ## Persistence model
 
@@ -188,6 +188,20 @@ Authentication errors with status 401 or text matching `invalid_grant` or `unaut
 
 SQLite operations are synchronous and message inserts are individually committed. There is no transaction spanning a Gmail page or job, which is why successful rows survive later request failures.
 
+## Jev classification
+
+Classification is manually triggered with `POST /api/accounts/:accountId/classification`. It snapshots the highest local ID and count of currently unclassified account messages into `classification_jobs`; a duplicate request while that account has queued/running classification returns 409. For page-only runs, the request includes the displayed Gmail `messageIds` (1–100); the API resolves only unclassified rows belonging to that account and persists their local IDs in `classification_jobs.message_ids_json`. The worker restricts processing to that saved selection, including after restart. An omitted selection means all unclassified account messages. Existing job tables receive the nullable selection column through an explicit compatibility check. No Gmail connection is required. New messages above the snapshot boundary wait for the next manual run.
+
+`server/src/classification-worker.ts` runs one sequential classification loop across accounts, independently of the existing Gmail worker. It selects unclassified messages up to the job's maximum ID, sends sender and subject through `server/src/jev.ts`, and transactionally updates the existing message's nullable `category` and job progress. A partial index on `(account_id, id) WHERE category IS NULL` supports this selection. Updates never recreate deleted rows. Deletions can make the completed count smaller than the initial total.
+
+Editable instructions and structured category definitions (`covers`, `not_for`, and sender/subject examples) live in `server/src/classification-guidance.ts`. The adapter includes them in every request. The Jev adapter uses the HTTP API with one Choice question and seven options: `newsletter`, `marketing`, `dev_update`, `travel`, `social_media`, `purchases`, and `other`. It validates the probability values and stores the option with the highest probability without a confidence threshold. Equal maxima use the first category in the declared order. Only sender and subject leave the app; there is no importance assessment. The key stays on the backend.
+
+Requests time out after 30 seconds. HTTP 429/5xx responses get up to three attempts with bounded backoff and Retry-After handling; long cooldowns, authentication failures, transport failures, and invalid responses fail the job visibly. Previously saved results survive. A new manual run processes remaining unclassified messages. Startup changes interrupted `running` classification jobs to `queued`, preserving progress and the snapshot boundary. Classification results are not refreshed automatically.
+
+`GET /api/accounts/:accountId/classification` returns whether Jev is configured, the account's unclassified count, and latest job. The frontend shows classification controls, notices, and category badges only after the status endpoint confirms that Jev is configured. Without a key, it uses the ordinary action-column width and hides even previously saved categories without deleting them. The CLASSIFY toggle beside More columns reveals page/all classification actions and a note explaining scope and data sent. The Messages screen polls this endpoint and refreshes visible rows as progress changes. Badges sit in the last column before the Gmail link. The message JSON and CSV expose `category`; category sorting/filtering is not added.
+
+`DELETE /api/classifications` resets every non-null message category across every account with one SQLite update. It returns 409 if any classification job is queued or running, preventing pending Jev results from repopulating erased categories. It requires no Jev API key and preserves messages and job history. The UI places this action at the far right of the classification toolbar with inline two-click confirmation, then refreshes categories and status after success.
+
 ## Read and export APIs
 
 The API is implemented directly in `server/src/index.ts`; there is no controller/service abstraction or version prefix beyond `/api`.
@@ -316,7 +330,7 @@ npm test
 
 `npm run build` is also an important verification step because it type-checks the React application, bundles the frontend, and compiles the Node backend.
 
-There are no automated tests for OAuth, Gmail requests, retry timing, worker recovery, CSV output, Express routes, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
+Focused classification tests cover probability selection, request contents, invalid responses, partial-failure retry, account/snapshot boundaries, and deletion during processing. There are no automated tests for OAuth, Gmail requests, retry timing, Gmail worker recovery, CSV output, Express routes, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
 
 `legacy/code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
 

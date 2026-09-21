@@ -13,7 +13,7 @@ export const messageColumns = [
   'attachment_bytes',
 ] as const;
 
-export const messageSelectColumns = [...messageColumns, 'attachments_json'] as const;
+export const messageSelectColumns = [...messageColumns, 'attachments_json', 'category'] as const;
 
 type MessageColumn = (typeof messageColumns)[number];
 

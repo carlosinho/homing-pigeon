@@ -20,6 +20,13 @@ import {
   senderDomainSql,
 } from './query.js';
 import { wakeWorker } from './worker.js';
+import { classifyMessage } from './jev.js';
+import { createClassificationWorker } from './classification-worker.js';
+
+const runClassificationWorker = createClassificationWorker(db, classifyMessage);
+function wakeClassificationWorker() {
+  if (config.typesafeApiKey) void runClassificationWorker().catch(console.error);
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -28,6 +35,9 @@ app.use(express.json({ limit: '32kb' }));
 const idSchema = z.coerce.number().int().positive();
 const jobSchema = z.object({ query: z.string().trim().min(1).max(1_000) });
 const messageIdSchema = z.string().trim().min(1);
+const classificationSchema = z.object({
+  messageIds: z.array(messageIdSchema).min(1).max(100).optional(),
+}).strict();
 const senderDeleteSchema = z.object({ senderEmail: z.string().trim().min(1) });
 const domainDeleteSchema = z.object({ senderDomain: z.string().trim().min(1) });
 
@@ -253,6 +263,62 @@ app.post('/api/jobs/:jobId/retry', (request, response) => {
   response.json(job);
 });
 
+app.delete('/api/classifications', (_request, response) => {
+  const active = db.prepare("SELECT 1 FROM classification_jobs WHERE status IN ('queued', 'running') LIMIT 1").get();
+  if (active) {
+    response.status(409).json({ error: 'Wait for classification to finish in all accounts before erasing classifications.' });
+    return;
+  }
+  const result = db.prepare('UPDATE messages SET category = NULL WHERE category IS NOT NULL').run();
+  response.json({ erasedCount: result.changes });
+});
+
+app.get('/api/accounts/:accountId/classification', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  if (!getAccount(accountId)) {
+    response.status(404).json({ error: 'Account not found.' });
+    return;
+  }
+  const job = db.prepare('SELECT * FROM classification_jobs WHERE account_id = ? ORDER BY id DESC LIMIT 1').get(accountId);
+  const { count } = db.prepare('SELECT COUNT(*) AS count FROM messages WHERE account_id = ? AND category IS NULL')
+    .get(accountId) as { count: number };
+  response.json({ configured: Boolean(config.typesafeApiKey), unclassifiedCount: count, job: job || null });
+});
+
+app.post('/api/accounts/:accountId/classification', (request, response) => {
+  const accountId = idSchema.parse(request.params.accountId);
+  const { messageIds } = classificationSchema.parse(request.body ?? {});
+  if (!getAccount(accountId)) {
+    response.status(404).json({ error: 'Account not found.' });
+    return;
+  }
+  if (!config.typesafeApiKey) {
+    response.status(400).json({ error: 'Set TYPESAFE_API_KEY in .env and restart the server.' });
+    return;
+  }
+  const active = db.prepare("SELECT 1 FROM classification_jobs WHERE account_id = ? AND status IN ('queued', 'running')").get(accountId);
+  if (active) {
+    response.status(409).json({ error: 'Classification is already queued or running for this account.' });
+    return;
+  }
+  const selectedIds = messageIds ? db.prepare(`SELECT id FROM messages
+    WHERE account_id = ? AND category IS NULL
+    AND gmail_message_id IN (${messageIds.map(() => '?').join(',')})`)
+    .all(accountId, ...messageIds) as Array<{ id: number }> : null;
+  const { count, maxId } = selectedIds
+    ? { count: selectedIds.length, maxId: Math.max(0, ...selectedIds.map((row) => row.id)) }
+    : db.prepare('SELECT COUNT(*) AS count, MAX(id) AS maxId FROM messages WHERE account_id = ? AND category IS NULL')
+      .get(accountId) as { count: number; maxId: number | null };
+  if (!count) {
+    response.status(400).json({ error: 'No unclassified messages.' });
+    return;
+  }
+  const result = db.prepare('INSERT INTO classification_jobs (account_id, max_message_id, total_count, message_ids_json) VALUES (?, ?, ?, ?)')
+    .run(accountId, maxId, count, selectedIds ? JSON.stringify(selectedIds.map((row) => row.id)) : null);
+  response.status(202).json(db.prepare('SELECT * FROM classification_jobs WHERE id = ?').get(result.lastInsertRowid));
+  wakeClassificationWorker();
+});
+
 app.get('/api/accounts/:accountId/messages', (request, response) => {
   const accountId = idSchema.parse(request.params.accountId);
   const query = buildMessageQuery(accountId, request.query);
@@ -301,7 +367,7 @@ app.get('/api/accounts/:accountId/messages.csv', (request, response) => {
     'Content-Disposition',
     `attachment; filename="gmail-messages-${new Date().toISOString().slice(0, 10)}.csv"`,
   );
-  const csvColumns = [...messageColumns, 'attachments'] as const;
+  const csvColumns = [...messageColumns, 'attachments', 'category'] as const;
   response.write(`\ufeff${csvColumns.map(csvCell).join(',')}\r\n`);
   for (const row of rows) {
     const values = csvColumns.map((column) => {
@@ -426,4 +492,5 @@ if (existsSync(publicDirectory)) {
 app.listen(config.port, '127.0.0.1', () => {
   console.log(`Homing Pigeon is running at http://localhost:${config.port}`);
   wakeWorker();
+  wakeClassificationWorker();
 });

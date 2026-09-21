@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAccount } from '../account-context';
 import { api } from '../api';
@@ -18,7 +18,17 @@ import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
 import { formatBytes } from '../formats';
-import type { Message, MessagePage } from '../types';
+import type { ClassificationStatus, Message, MessagePage } from '../types';
+
+const categoryLabels: Record<NonNullable<Message['category']>, string> = {
+  newsletter: 'Newsletter',
+  marketing: 'Marketing',
+  dev_update: 'Dev update',
+  travel: 'Travel',
+  social_media: 'Social media junk',
+  purchases: 'Purchases',
+  other: 'Other',
+};
 
 const columns = [
   { key: 'sender_email', label: 'Sender', minWidth: '13rem', secondary: false },
@@ -86,6 +96,104 @@ export function MessagesPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [classification, setClassification] = useState<{ accountId: number; data: ClassificationStatus } | null>(null);
+  const [classificationError, setClassificationError] = useState('');
+  const [classificationReload, setClassificationReload] = useState(0);
+  const [startingClassification, setStartingClassification] = useState(false);
+  const [classificationOpen, setClassificationOpen] = useState(false);
+  const [confirmEraseClassifications, setConfirmEraseClassifications] = useState(false);
+  const [erasingClassifications, setErasingClassifications] = useState(false);
+  const [eraseClassificationsError, setEraseClassificationsError] = useState('');
+  const [classificationNotice, setClassificationNotice] = useState('');
+  const currentAccountId = useRef(activeAccount?.id);
+  currentAccountId.current = activeAccount?.id;
+  const classificationStatus = classification?.accountId === activeAccount?.id ? classification?.data : undefined;
+  const classificationEnabled = classificationStatus?.configured === true;
+  const actionColumnClass = `sticky-action${classificationEnabled ? ' classification-actions' : ''}`;
+  const classificationRunning = classificationStatus?.job?.status === 'queued' || classificationStatus?.job?.status === 'running';
+
+  useEffect(() => {
+    if (!classificationEnabled) {
+      setClassificationOpen(false);
+      setClassificationNotice('');
+    }
+  }, [classificationEnabled]);
+
+  useEffect(() => {
+    setConfirmEraseClassifications(false);
+  }, [activeAccount?.id, classificationOpen]);
+
+  const eraseClassifications = async () => {
+    if (!classificationEnabled || erasingClassifications || startingClassification || classificationRunning) return;
+    if (!confirmEraseClassifications) {
+      setConfirmEraseClassifications(true);
+      return;
+    }
+    setErasingClassifications(true);
+    setEraseClassificationsError('');
+    setClassificationNotice('');
+    try {
+      const { erasedCount } = await api.eraseClassifications();
+      setClassificationReload((value) => value + 1);
+      setReloadKey((value) => value + 1);
+      setClassificationNotice(`${erasedCount.toLocaleString()} classifications erased across all accounts.`);
+    } catch (caught) {
+      setEraseClassificationsError(caught instanceof Error ? caught.message : 'Could not erase classifications.');
+    } finally {
+      setConfirmEraseClassifications(false);
+      setErasingClassifications(false);
+    }
+  };
+
+  useEffect(() => {
+    setClassificationError('');
+    if (!activeAccount) return;
+    let active = true;
+    let timer: number;
+    let lastProgress = '';
+    const poll = async () => {
+      try {
+        const data = await api.classification(activeAccount.id);
+        if (!active) return;
+        setClassification({ accountId: activeAccount.id, data });
+        setClassificationError('');
+        const progress = JSON.stringify(data.job);
+        if (lastProgress && progress !== lastProgress) setReloadKey((value) => value + 1);
+        lastProgress = progress;
+        const running = data.job?.status === 'queued' || data.job?.status === 'running';
+        timer = window.setTimeout(() => void poll(), running ? 1500 : 5000);
+      } catch (caught) {
+        if (!active) return;
+        setClassificationError(caught instanceof Error ? caught.message : 'Could not load classification status.');
+        timer = window.setTimeout(() => void poll(), 5000);
+      }
+    };
+    void poll();
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [activeAccount?.id, classificationReload]);
+
+  const classifyMessages = async (scope: 'page' | 'all') => {
+    if (!classificationEnabled || !activeAccount || startingClassification || classificationRunning || erasingClassifications) return;
+    if (scope === 'page' && (loading || resultAccountId !== activeAccount.id)) return;
+    const accountId = activeAccount.id;
+    setStartingClassification(true);
+    setConfirmEraseClassifications(false);
+    setClassificationError('');
+    try {
+      await api.classifyMessages(accountId, scope === 'page'
+        ? result.rows.filter((message) => !message.category).map((message) => message.gmail_message_id)
+        : undefined);
+      if (currentAccountId.current !== accountId) return;
+      setClassificationReload((value) => value + 1);
+      setReloadKey((value) => value + 1);
+    } catch (caught) {
+      if (currentAccountId.current === accountId) {
+        setClassificationError(caught instanceof Error ? caught.message : 'Could not start classification.');
+      }
+    } finally {
+      setStartingClassification(false);
+    }
+  };
 
   const params = useMemo(
     () => ({ search, ...filters, sender_domain: senderDomain, sortBy, sortDir, page, pageSize: 25 }),
@@ -285,8 +393,72 @@ export function MessagesPage() {
           >
             <Eye size={15} /> More columns
           </button>
+          {classificationEnabled ? (
+            <button
+              className={`button button-filter ${classificationOpen ? 'active' : ''}`}
+              type="button"
+              aria-expanded={classificationOpen}
+              aria-controls="classification-panel"
+              onClick={() => setClassificationOpen((current) => !current)}
+            >
+              CLASSIFY
+            </button>
+          ) : null}
           <span className="result-count value">{result.total.toLocaleString()} messages</span>
         </div>
+
+        {classificationEnabled && classificationOpen ? (
+          <div id="classification-panel" className="classification-panel">
+            <div className="classification-toolbar">
+              <button
+                className="button"
+                type="button"
+                disabled={!classificationStatus?.configured || classificationRunning || startingClassification || erasingClassifications || loading || resultAccountId !== activeAccount?.id || !result.rows.some((message) => !message.category)}
+                onClick={() => void classifyMessages('page')}
+              >
+                Classify this page
+              </button>
+              <button
+                className="button"
+                type="button"
+                disabled={!classificationStatus?.configured || !classificationStatus.unclassifiedCount || classificationRunning || startingClassification || erasingClassifications}
+                onClick={() => void classifyMessages('all')}
+              >
+                Classify all
+              </button>
+              {classificationRunning || startingClassification ? (
+                <span role="status">
+                  <LoaderCircle className="spin" size={15} />{' '}
+                  {classificationRunning
+                    ? `${classificationStatus?.job?.processed_count.toLocaleString()} / ${classificationStatus?.job?.total_count.toLocaleString()} classified · ${classificationStatus?.job?.status}`
+                    : 'Starting classification…'}
+                </span>
+              ) : null}
+              <button
+                className={`button button-danger erase-classifications ${confirmEraseClassifications ? 'confirming' : ''}`}
+                type="button"
+                disabled={erasingClassifications || startingClassification || classificationRunning}
+                aria-label={confirmEraseClassifications ? 'Confirm erasing classifications across all accounts' : 'Erase classifications across all accounts'}
+                onClick={() => void eraseClassifications()}
+              >
+                {erasingClassifications ? <LoaderCircle className="spin" size={15} /> : null}
+                {erasingClassifications ? 'Erasing…' : confirmEraseClassifications ? 'Sure?' : 'Erase classifications'}
+              </button>
+            </div>
+            <p>
+              Only unclassified messages will be classified. Sends sender and subject to Jev.
+              {' '}“Classify this page” uses the messages currently displayed; “Classify all” includes all messages in this account, even those hidden by filters.
+              {' '}“Erase classifications” clears categories for every message across all accounts; messages are kept.
+            </p>
+            {eraseClassificationsError ? <div className="error-banner" role="alert">{eraseClassificationsError}</div> : null}
+            <p>{classificationStatus?.unclassifiedCount.toLocaleString()} unclassified in this account.</p>
+            {classificationError || classificationStatus?.job?.status === 'failed' ? (
+              <div className="error-banner" role="alert">
+                {classificationError || `${classificationStatus?.job?.error} Choose a classification option to retry; saved categories will be kept.`}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {senderDomain !== undefined ? (
           <div className="active-domain-filter">
@@ -308,6 +480,7 @@ export function MessagesPage() {
 
         {error ? <div className="error-banner" role="alert">{error}</div> : null}
         {notice ? <div className="notice-banner" role="status">{notice}</div> : null}
+        {classificationEnabled && classificationNotice ? <div className="notice-banner" role="status">{classificationNotice}</div> : null}
 
         <div className={`table-scroll ${loading ? 'table-loading' : ''}`}>
           <table>
@@ -323,7 +496,7 @@ export function MessagesPage() {
                     </button>
                   </th>
                 ))}
-                <th className="sticky-action"><span className="sr-only">Actions</span></th>
+                <th className={actionColumnClass}><span className="sr-only">{classificationEnabled ? 'Category and actions' : 'Actions'}</span></th>
               </tr>
               {filtersOpen ? (
                 <tr className="filter-row">
@@ -340,7 +513,7 @@ export function MessagesPage() {
                       />
                     </th>
                   ))}
-                  <th className="sticky-action" />
+                  <th className={actionColumnClass} />
                 </tr>
               ) : null}
             </thead>
@@ -376,8 +549,13 @@ export function MessagesPage() {
                       <td className="value-cell">{message.gmail_thread_id}</td>
                     </>
                   ) : null}
-                  <td className="sticky-action">
+                  <td className={actionColumnClass}>
                     <div className="row-actions">
+                      {classificationEnabled ? message.category ? (
+                        <span className="category-badge">{categoryLabels[message.category]}</span>
+                      ) : (
+                        <span className="category-unclassified" title="Not classified">—</span>
+                      ) : null}
                       <a
                         className="icon-button"
                         href={gmailLink(activeAccount?.email || '', message)}

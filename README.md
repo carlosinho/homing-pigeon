@@ -56,6 +56,18 @@ The Messages screen provides server-side pagination, sorting on every stored fie
 
 The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` representation in SQLite, while dates displayed in the browser use the browser's local timezone.
 
+### Classify messages with Jev
+
+Classification UI is shown only when `TYPESAFE_API_KEY` is configured. Without it, the CLASSIFY toggle, panel, and all category badges are hidden, including previously saved classifications. Saved categories remain in the database and become visible again when the key is restored. Restart the backend after changing `.env`.
+
+Set `TYPESAFE_API_KEY` in `.env`, restart the backend, and click **CLASSIFY** on the Messages screen. The revealed section offers **Classify this page** and **Classify all**, including rows hidden by filters. Both options skip messages that already have categories. It sends only sender email and subject to TypeSafe's Jev API.
+
+Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with progress on the Messages screen.
+
+**Adjust the classifier:** edit [`server/src/classification-guidance.ts`](./server/src/classification-guidance.ts). It contains the shared instructions plus `covers`, `not_for`, and sender/subject examples for every category. Keep the category keys unchanged. Restart the backend after editing; for a built deployment, run `npm run build` before restarting. Changes affect future requests, not saved categories.
+
+**Start over:** the **Erase classifications** button - erases categories from **every message in every account**, regardless of the current page or filters. Messages and job history are retained. Erasure is blocked while any account has queued or running classification. You can then classify again with your adjusted instructions.
+
 ### 4. Rank senders and domains
 
 The Senders screen groups the current account's stored messages by normalized sender email. It defaults to the greatest combined message size and also shows message count. Selecting a sender opens the Messages screen with that sender filter applied. The external-link action beside an address opens a new Gmail tab with a `from:<sender>` search.
@@ -101,6 +113,8 @@ Information moved to `GoogleOAuth.md`
 | `GOOGLE_REDIRECT_URI` | No | `http://localhost:3001/api/auth/google/callback` | OAuth callback URL. It must exactly match an authorized redirect URI in Google Cloud. |
 | `APP_URL` | No | `http://localhost:5173` | Frontend URL used after the OAuth callback. Use the default for development and `http://localhost:3001` for a built local deployment. |
 | `PORT` | No | `3001` | Express port. The server always binds to `127.0.0.1`. The Vite development proxy is statically configured for port 3001, so changing this also requires changing `vite.config.ts`. |
+| `TYPESAFE_API_KEY` | Only for classification | none | Backend-only TypeSafe API key. Sender and subject are sent to Jev when classification runs. |
+| `TYPESAFE_MODEL` | No | `jev-latest` | Jev model used for classification. |
 | `REQUEST_DELAY_MS` | No | `300` | Minimum delay between Gmail API requests, shared by all accounts and jobs. Use a non-negative number. |
 
 The SQLite location is not configurable: it is `.data/mailroom.db` relative to the directory from which the backend is started.
@@ -206,6 +220,9 @@ The React client uses these endpoints directly. There is no separate API authent
 | `POST` | `/api/accounts/:accountId/jobs` | Queue a fetch. JSON body: `{ "query": "in:inbox older:1y" }`. Queries must contain 1–1,000 characters after trimming. |
 | `GET` | `/api/accounts/:accountId/jobs` | Return recent fetch jobs and local-data activity for the account. |
 | `POST` | `/api/jobs/:jobId/retry` | Move a failed job back to `queued`. Returns 409 for a job not currently failed. |
+| `DELETE` | `/api/classifications` | Erase all message categories across all accounts. Returns 409 while any classification is queued/running. |
+| `GET` | `/api/accounts/:accountId/classification` | Return configuration status, unclassified count, and latest classification job. |
+| `POST` | `/api/accounts/:accountId/classification` | Queue classification of unclassified account messages. Optional JSON `messageIds` limits the run to the displayed Gmail message IDs (1–100); omit it for all messages. Returns 409 if already active. |
 | `GET` | `/api/accounts/:accountId/messages` | Return a page of account messages. |
 | `GET` | `/api/accounts/:accountId/messages.csv` | Stream all matching account messages as CSV. |
 | `GET` | `/api/accounts/:accountId/senders` | Return grouped sender counts. |

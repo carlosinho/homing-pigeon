@@ -41,6 +41,7 @@ export type MessageAttachment = {
 };
 
 export type Message = {
+  category: 'newsletter' | 'marketing' | 'dev_update' | 'travel' | 'social_media' | 'purchases' | 'other' | null;
   sender_email: string;
   subject: string;
   received_at: number;
@@ -74,4 +75,18 @@ export type Page<T> = {
 
 export type MessagePage = Page<Message> & {
   inventoryTotal: number;
+};
+
+export type ClassificationJob = {
+  id: number;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  total_count: number;
+  processed_count: number;
+  error: string | null;
+};
+
+export type ClassificationStatus = {
+  configured: boolean;
+  unclassifiedCount: number;
+  job: ClassificationJob | null;
 };

@@ -1047,6 +1047,55 @@ tbody tr:hover td.sticky-action {
   gap: 8px;
 }
 
+.classification-panel {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+
+.classification-panel p {
+  margin: 8px 0 0;
+}
+
+.classification-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 3px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.erase-classifications {
+  margin-left: auto;
+}
+
+.erase-classifications.confirming {
+  border-color: currentColor;
+}
+
+.classification-actions {
+  width: 260px;
+  min-width: 260px;
+}
+
+.category-unclassified {
+  color: var(--ink-2);
+}
+
 .row-delete-column {
   width: 68px;
   min-width: 68px;

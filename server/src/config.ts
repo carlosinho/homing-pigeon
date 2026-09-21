@@ -10,6 +10,8 @@ export const config = {
     process.env.GOOGLE_REDIRECT_URI ||
     'http://localhost:3001/api/auth/google/callback',
   requestDelayMs: Number(process.env.REQUEST_DELAY_MS || 300),
+  typesafeApiKey: process.env.TYPESAFE_API_KEY || '',
+  typesafeModel: process.env.TYPESAFE_MODEL || 'jev-latest',
   dataDirectory: resolve(process.cwd(), '.data'),
 };
 

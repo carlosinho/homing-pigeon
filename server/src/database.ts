@@ -72,6 +72,20 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS classification_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'queued',
+    max_message_id INTEGER NOT NULL,
+    total_count INTEGER NOT NULL,
+    processed_count INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_classification_account
+    ON classification_jobs(account_id, id DESC);
+
   CREATE INDEX IF NOT EXISTS idx_jobs_account_created
     ON fetch_jobs(account_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_jobs_status
@@ -94,6 +108,17 @@ const activityEventColumns = db
 if (!activityEventColumns.some((column) => column.name === 'target')) {
   db.exec("ALTER TABLE activity_events ADD COLUMN target TEXT NOT NULL DEFAULT ''");
 }
+
+const messageTableColumns = db.prepare('PRAGMA table_info(messages)').all() as Array<{ name: string }>;
+if (!messageTableColumns.some((column) => column.name === 'category')) {
+  db.exec('ALTER TABLE messages ADD COLUMN category TEXT');
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_messages_unclassified ON messages(account_id, id) WHERE category IS NULL');
+const classificationJobColumns = db.prepare('PRAGMA table_info(classification_jobs)').all() as Array<{ name: string }>;
+if (!classificationJobColumns.some((column) => column.name === 'message_ids_json')) {
+  db.exec('ALTER TABLE classification_jobs ADD COLUMN message_ids_json TEXT');
+}
+db.prepare("UPDATE classification_jobs SET status = 'queued' WHERE status = 'running'").run();
 
 db.prepare(
   `UPDATE fetch_jobs
