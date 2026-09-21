@@ -1,8 +1,12 @@
-# Homing Pigeon
+<h1 align="center">Homing Pigeon</h1>
+
+<img src="public/homing-pigeon.png" alt="Homing Pigeon" width="230" align="left" />
 
 Homing Pigeon is a local Gmail inventory for answering a practical cleanup question: which senders and messages account for the most storage in an account? Gives you a browser interface, a background fetch process, local persistence, and CSV exports.
 
 Homing Pigeon is read-only. It does not archive, label, trash, delete, or unsubscribe from messages.
+
+<br clear="left" />
 
 ## What it does
 
