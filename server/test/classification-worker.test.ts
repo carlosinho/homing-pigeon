@@ -17,6 +17,63 @@ function fixture() {
 afterEach(() => { databases.splice(0).forEach((db) => db.close()); });
 
 describe('classification worker', () => {
+  function concurrentFixture() {
+    const db = fixture();
+    for (let id = 4; id <= 7; id += 1) {
+      db.prepare("INSERT INTO messages VALUES (?, 1, 'test@example.com', 'Digest', NULL, NULL)").run(id);
+    }
+    db.exec('UPDATE classification_jobs SET max_message_id = 7');
+    const pending = new Map<number, {
+      resolve: (result: { category: 'other'; probable_spam: boolean }) => void;
+      reject: (error: Error) => void;
+    }>();
+    const classify = vi.fn((message: { id: number }) => new Promise<{ category: 'other'; probable_spam: boolean }>((resolve, reject) => {
+      pending.set(message.id, { resolve, reject });
+    }));
+    const complete = async (id: number) => {
+      pending.get(id)!.resolve({ category: 'other', probable_spam: false });
+      await Promise.resolve();
+    };
+    return { db, classify, pending, complete };
+  }
+
+  it('uses four slots, saves out-of-order results immediately, and refills without duplicates', async () => {
+    const { db, classify, complete } = concurrentFixture();
+    const run = createClassificationWorker(db, classify);
+    const running = run();
+    expect(classify.mock.calls.map(([message]) => message.id)).toEqual([1, 2, 4, 5]);
+    await run();
+    expect(classify).toHaveBeenCalledTimes(4);
+    await complete(5);
+    expect(db.prepare('SELECT category FROM messages WHERE id = 5').get()).toEqual({ category: 'other' });
+    expect(db.prepare('SELECT status, processed_count FROM classification_jobs').get()).toEqual({ status: 'running', processed_count: 1 });
+    expect(classify.mock.calls.map(([message]) => message.id)).toEqual([1, 2, 4, 5, 6]);
+    await complete(2);
+    expect(classify.mock.calls.map(([message]) => message.id)).toEqual([1, 2, 4, 5, 6, 7]);
+    for (const id of [1, 4, 6, 7]) await complete(id);
+    await running;
+    expect(db.prepare('SELECT status, processed_count FROM classification_jobs').get()).toEqual({ status: 'completed', processed_count: 6 });
+  });
+
+  it('stops scheduling on failure and drains successes before failing or starting another job', async () => {
+    const { db, classify, pending, complete } = concurrentFixture();
+    db.exec("INSERT INTO classification_jobs (id, account_id, max_message_id, status) VALUES (2, 2, 3, 'queued')");
+    const running = createClassificationWorker(db, classify)();
+    pending.get(2)!.reject(new Error('Jev unavailable'));
+    await Promise.resolve();
+    await complete(5);
+    await complete(4);
+    expect(classify).toHaveBeenCalledTimes(4);
+    expect(db.prepare('SELECT status FROM classification_jobs ORDER BY id').all()).toEqual([{ status: 'running' }, { status: 'queued' }]);
+    await complete(1);
+    // Let the drained job finalize and the next job start.
+    await vi.waitFor(() => expect(pending.has(3)).toBe(true));
+    expect(db.prepare('SELECT status, processed_count, error FROM classification_jobs WHERE id = 1').get()).toEqual({ status: 'failed', processed_count: 3, error: 'Jev unavailable' });
+    expect(db.prepare('SELECT id FROM messages WHERE account_id = 1 AND category IS NULL ORDER BY id').all()).toEqual([{ id: 2 }, { id: 6 }, { id: 7 }]);
+    await complete(3);
+    await running;
+  });
+
   it('classifies only the saved page selection and skips already classified messages', async () => {
     const db = fixture();
     db.exec(`

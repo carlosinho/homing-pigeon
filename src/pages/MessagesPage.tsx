@@ -160,10 +160,10 @@ export function MessagesPage() {
         setClassification({ accountId: activeAccount.id, data });
         setClassificationError('');
         const progress = JSON.stringify(data.job);
-        if (lastProgress && progress !== lastProgress) setReloadKey((value) => value + 1);
+        if (progress !== lastProgress && (lastProgress || data.job)) setReloadKey((value) => value + 1);
         lastProgress = progress;
         const running = data.job?.status === 'queued' || data.job?.status === 'running';
-        timer = window.setTimeout(() => void poll(), running ? 1500 : 5000);
+        timer = window.setTimeout(() => void poll(), running ? 500 : 5000);
       } catch (caught) {
         if (!active) return;
         setClassificationError(caught instanceof Error ? caught.message : 'Could not load classification status.');
@@ -202,8 +202,14 @@ export function MessagesPage() {
     [filters, page, search, senderDomain, sortBy, sortDir],
   );
 
+  const messageRead = useRef<{ accountId: number; params: typeof params; readyAt: number } | null>(null);
+
   useEffect(() => {
     if (!activeAccount) return;
+    // Debounce query changes, but refresh classification progress immediately once settled.
+    if (messageRead.current?.accountId !== activeAccount.id || messageRead.current.params !== params) {
+      messageRead.current = { accountId: activeAccount.id, params, readyAt: Date.now() + 220 };
+    }
     setResultAccountId(null);
     setPendingDeleteId('');
     let active = true;
@@ -222,7 +228,7 @@ export function MessagesPage() {
       } finally {
         if (active) setLoading(false);
       }
-    }, 220);
+    }, Math.max(0, messageRead.current.readyAt - Date.now()));
     return () => {
       active = false;
       window.clearTimeout(timer);

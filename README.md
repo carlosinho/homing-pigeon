@@ -76,7 +76,7 @@ Classification UI is shown only when `TYPESAFE_API_KEY` is configured. Without i
 
 Set `TYPESAFE_API_KEY` in `.env`, restart the backend, and click **CLASSIFY** on the Messages screen. The revealed section offers **Classify this page** and **Classify all**, including rows hidden by filters. Both options skip messages that already have categories.
 
-Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with progress on the Messages screen. The same Jev request independently assesses probable spam. A spam probability of at least 0.7 shows ☠️ beside the category.
+Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with up to four concurrent Jev requests per job and progress refreshed every 500 ms on the Messages screen. Jobs run one at a time across accounts. The same Jev request independently assesses probable spam. A spam probability of at least 0.7 shows ☠️ beside the category.
 
 **Adjust the classifier:** edit [`server/src/classification-guidance.ts`](./server/src/classification-guidance.ts). It contains the category instructions plus `covers`, `not_for`, and sender/subject examples for every category, as well as separate spam guidance and examples. Keep the category keys unchanged. Restart the backend after editing; for a built deployment, run `npm run build` before restarting. Changes affect future requests, not saved categories.
 

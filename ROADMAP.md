@@ -50,6 +50,9 @@
 - [x] Add privacy view
   - Footer toggle masks sender addresses in the Messages and Senders tables and standalone domains in the Domains table by covering contiguous middle chunks with solid bars using the locally hosted Redacted font.
   - Messages subjects use the same chunk redaction within words, preserving spaces and copyable text; full-subject hover tooltips are hidden while enabled.
+- [x] Jev performance improvements
+  - Process up to four Jev requests concurrently within one active job, saving each result immediately and draining outstanding requests before finalizing a failed job.
+  - Refresh active classification status every 500 ms and update settled message views without the filter debounce.
 
 ### Backlog / future
 
