@@ -5,6 +5,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import packageMetadata from '../../package.json';
 import homingPigeonLogo from '../assets/homing-pigeon-logo.png';
 import { useAccount } from '../account-context';
+import { usePrivacy } from '../privacy-context';
 
 const navigation = [
   { to: '/fetch', label: 'Fetch' },
@@ -14,6 +15,7 @@ const navigation = [
 ];
 
 export function Layout() {
+  const { enabled: privacyEnabled, toggle: togglePrivacy } = usePrivacy();
   const { logout } = useSession();
   const [logoutError, setLogoutError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
@@ -100,6 +102,15 @@ export function Layout() {
       <footer className="app-footer">
         <button className="text-button" disabled={loggingOut} onClick={() => void handleLogout()}>
           {loggingOut ? 'Logging out…' : 'Log out'}
+        </button>
+        <button
+          className="text-button privacy-toggle"
+          type="button"
+          aria-pressed={privacyEnabled}
+          onClick={togglePrivacy}
+          title="Redact sender addresses, message subjects, and domains in the main tables"
+        >
+          Privacy view: {privacyEnabled ? 'On' : 'Off'}
         </button>
         <span className="app-footer-version value">
           v {packageMetadata.version}

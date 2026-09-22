@@ -17,6 +17,8 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
+import { PrivateAddress } from '../components/PrivateAddress';
+import { PrivateSubject } from '../components/PrivateSubject';
 import { formatBytes } from '../formats';
 import type { ClassificationStatus, Message, MessagePage } from '../types';
 
@@ -520,8 +522,8 @@ export function MessagesPage() {
             <tbody>
               {result.rows.map((message) => (
                 <tr key={message.gmail_message_id}>
-                  <td className="sender-cell">{message.sender_email || 'Unknown sender'}</td>
-                  <td className="subject-cell" title={message.subject}>{message.subject || '(No subject)'}</td>
+                  <td className="sender-cell"><PrivateAddress value={message.sender_email} fallback="Unknown sender" /></td>
+                  <td className="subject-cell"><PrivateSubject value={message.subject} /></td>
                   <td className="value-cell storage-cell">{formatBytes(message.size_bytes)}</td>
                   <td className="value-cell attachment-cell">
                     {message.attachment_count ? (

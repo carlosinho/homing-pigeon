@@ -36,6 +36,8 @@ The Messages screen can delete one locally stored message or all messages for th
 
 Homing Pigeon is local-only: it binds to `127.0.0.1` and requires a single password login. It remains unsupported for shared or remote hosting. Gmail metadata and plaintext OAuth tokens stay in `.data/mailroom.db`; keep `.env` and `.data/` private. Optional Jev classification sends sender addresses and subjects to TypeSafe.
 
+The footer’s **Privacy view** toggle partially redacts sender addresses in the Messages and Senders tables and domain names in the Domains table, plus subjects in Messages. Contiguous middle chunks of names and domain labels appear as solid bars using the locally hosted Redacted font. Short prefixes and endings, address separators, and domain suffixes stay readable; short labels are fully covered. Subjects use the same chunk redaction within each word, preserving spaces; their full-text hover tooltip is disabled while privacy view is on. Copying preserves the original text. It defaults to off and remembers your choice across page navigation and reloads. This is display-only: other content (including the mailbox selector, filters, and Fetch activity), links, and CSV exports retain their original values.
+
 ## Main flows
 
 ### 1. Connect Gmail

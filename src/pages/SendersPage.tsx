@@ -14,6 +14,7 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
+import { PrivateAddress } from '../components/PrivateAddress';
 import { formatBytes } from '../formats';
 import type { Page, Sender } from '../types';
 
@@ -202,7 +203,7 @@ export function SendersPage() {
                   </td>
                   <td className="sender-cell">
                     <span className="sender-with-action">
-                      <span>{sender.sender_email || 'Unknown sender'}</span>
+                      <PrivateAddress value={sender.sender_email} fallback="Unknown sender" />
                       {sender.sender_email && resultAccountId === activeAccount?.id ? (
                         <a
                           className="icon-button sender-gmail-link"

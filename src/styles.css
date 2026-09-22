@@ -36,6 +36,23 @@
   src: url("/fonts/routed-gothic-narrow.woff") format("woff");
 }
 
+@font-face {
+  font-family: "Redacted";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/redacted-regular.ttf") format("truetype");
+}
+
+.redacted-chunk {
+  font-family: "Redacted", sans-serif;
+  /* Keep the bar opaque even before the font loads or for unsupported glyphs. */
+  display: inline-block;
+  background: currentColor;
+  line-height: 1;
+  clip-path: inset(0.2em 0 0.15em);
+}
+
 :root {
   --ground: #efeee9;
   --ground-raised: #f6f5f1;
@@ -298,6 +315,10 @@ select:focus-visible {
   border-top: 1px solid var(--rule);
   color: var(--ink-3);
   font-size: 0.72rem;
+}
+
+.privacy-toggle {
+  margin-left: 24px;
 }
 
 .app-footer-version {

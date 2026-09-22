@@ -47,9 +47,9 @@
   - Editable spam guidance and examples share `server/src/classification-guidance.ts`; random-looking sender addresses are supporting evidence, not an automatic verdict.
   - Show only ☠️ beside the category when spam probability is at least 0.7, with “probably spam” on hover.
   - Include `probable_spam` in message CSV exports (1/0/blank); Erase classifications clears both categories and spam assessments.
-- [ ] Add privacy view
-  - Needed to record videos or make screenshots of the app's window without capturing email addresses in the open. This is purely for display purposes, meaning the parts of the emails should be obscured so that the whole email address is not identifiable. For example, we can redact every other character in the email. We can use the Redacted google font for that.
-  - This can be a toggle in the settings. Do we have a settings page?
+- [x] Add privacy view
+  - Footer toggle masks sender addresses in the Messages and Senders tables and standalone domains in the Domains table by covering contiguous middle chunks with solid bars using the locally hosted Redacted font.
+  - Messages subjects use the same chunk redaction within words, preserving spaces and copyable text; full-subject hover tooltips are hidden while enabled.
 
 ### Backlog / future
 

@@ -6,6 +6,7 @@ import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
 import { Pagination } from '../components/Pagination';
+import { PrivateAddress } from '../components/PrivateAddress';
 import type { Domain, Page } from '../types';
 
 export function DomainsPage() {
@@ -178,7 +179,7 @@ export function DomainsPage() {
                   <td className="rank-column value">
                     {String((page - 1) * result.pageSize + index + 1).padStart(2, '0')}
                   </td>
-                  <td className="sender-cell">{domain.sender_domain || 'Unknown domain'}</td>
+                  <td className="sender-cell"><PrivateAddress value={domain.sender_domain} fallback="Unknown domain" /></td>
                   <td className="volume-column">
                     <span
                       className="volume"
