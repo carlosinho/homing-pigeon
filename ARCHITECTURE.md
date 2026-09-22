@@ -116,11 +116,11 @@ This table records successful destructive local-data actions without overloading
 
 ## OAuth and account flow
 
-1. `GET /api/auth/google/start` verifies that both Google client variables exist.
-2. The server creates 24 random bytes encoded as hex, stores the state value and a ten-minute expiry in a process-local `Map`, and returns a Google authorization URL.
+1. Authenticated `POST /api/auth/google/start` verifies that both Google client variables exist.
+2. The server creates 24 random bytes encoded as hex, stores the state value, initiating app session ID, and a ten-minute expiry in a process-local `Map`, and returns a Google authorization URL.
 3. The authorization request uses `access_type=offline`, `prompt=consent select_account`, and the single scope `https://www.googleapis.com/auth/gmail.readonly`.
 4. Google redirects to `GET /api/auth/google/callback`.
-5. The callback consumes the state exactly once. Missing, unknown, expired, or process-lost state redirects to `/fetch?authError=invalid_callback`.
+5. The callback consumes the state exactly once. Missing, unknown, expired, session-mismatched, or process-lost state redirects to `/fetch?authError=invalid_callback`.
 6. The server exchanges the code for tokens, calls Gmail `users.getProfile`, and uses `emailAddress` to insert or update `accounts`.
 7. The callback redirects to `APP_URL/fetch?connected=<local account id>`.
 8. The React account context reloads account status and persists the active local account ID in `localStorage`.
@@ -246,7 +246,7 @@ React Router defines four routes under a shared `Layout`: `/fetch`, `/messages`,
 
 The root `package.json` version is the application's version source of truth. The frontend imports it at build time and displays it in the shared layout footer, so changing the package version changes the version shown on every route after rebuilding or restarting the development server.
 
-`AccountProvider` is the only shared client state. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
+`SessionProvider` checks `/api/session` before the inventory renders, handles expiry and API 401 responses, and clears other tabs on logout. The login screen replaces the inventory at its current URL, preserving the route for the next login. `AccountProvider` mounts only within the authenticated app. It loads `/api/auth/status`, chooses the previously selected account when possible, otherwise selects the first connected account or first known account, and exposes connect/disconnect actions. It does not use a client cache library.
 
 The Fetch screen polls job history recursively with `setTimeout`: every 1.5 seconds while any of the 12 returned jobs is queued or running, otherwise every 5 seconds. Failed polls display an error and retry after 5 seconds; a successful poll clears that error. The Messages, Senders, and Domains screens debounce server reads by 220 milliseconds and ignore responses from superseded reads. Messages defaults to estimated size descending and shows attachment metadata; Senders defaults to combined estimated size.
 
@@ -273,17 +273,22 @@ Styling is a single hand-written stylesheet, `src/styles.css`, using semantic cl
 The primary boundary is the local machine:
 
 - Express binds only to `127.0.0.1`.
-- The app has no user login, session, API key, or per-request authorization layer.
-- Any local process or browser context that can reach the loopback port can call its APIs, start jobs, disconnect accounts, and export stored data.
+- `APP_PASSWORD` is mandatory and backend-only; blank values prevent startup. There are no app user records.
+- `server/src/session.ts` mounts before the existing API routes. Only health, session status, login, and logout are public; data, exports, Google OAuth, and job mutations require a session.
+- Login compares fixed-length password digests with `timingSafeEqual`. The configured password remains plaintext in `.env`.
+- Sessions use random 32-byte tokens stored in a process-local map and an HttpOnly, SameSite=Lax cookie scoped to `/api`. They expire after eight hours, on logout, or on backend restart. The cookie uses Secure when APP_URL is HTTPS; supported loopback HTTP does not use Secure.
+- All API responses use `Cache-Control: no-store`. Non-safe HTTP methods require an Origin matching APP_URL, including login and logout.
+- Five failed login attempts block further attempts until the process-wide 15-minute attempt window expires. Expired sessions are removed on requests.
+- Access through the API requires the app password/session. Local file access remains outside this boundary; the SQLite inventory and credentials are not encrypted.
 - Google client credentials come from `.env`; Gmail tokens and metadata are plaintext in SQLite.
 - The data directory and main database file receive restrictive POSIX modes on a best-effort basis. The parent directory protection also covers SQLite WAL and shared-memory files.
-- OAuth callback state is random, single-use, expires after ten minutes, and is not persisted.
+- OAuth callback state is random, single-use, bound to the initiating app session, expires after ten minutes, and is not persisted. The callback requires that session to remain valid.
 - SQL values are parameterized. Sort column names are selected from allowlists before interpolation.
 - React performs its normal text escaping for displayed headers and addresses.
 - CSV cells receive formula-prefix protection.
 - `x-powered-by` is disabled.
 
-There is no explicit CSRF layer, origin validation, token encryption, OAuth grant revocation, audit logging, TLS, or secret manager integration. This is acceptable only for the intended loopback deployment. Changing the network binding without adding those controls would violate the current security assumptions.
+SameSite cookies and exact-origin checks protect state-changing API requests; Google callbacks use session-bound OAuth state. There is no token encryption, OAuth grant revocation, audit logging, TLS termination, or secret manager integration. This is acceptable only for the intended loopback deployment. Changing the network binding without adding those controls would violate the current security assumptions.
 
 ## Performance decisions and constraints
 
@@ -308,7 +313,7 @@ There is no explicit CSRF layer, origin validation, token encryption, OAuth gran
 - SQLite and plaintext local tokens make the design unsuitable for a horizontally scaled or multi-host deployment.
 - `better-sqlite3` and the Express event loop share one process. Current SQL operations are short, but large scans or exports can delay other requests.
 
-The schema and UI already support multiple Gmail accounts on one local installation. That is different from multi-user hosting: there are no user identities or authorization boundaries between those accounts.
+The schema and UI already support multiple Gmail accounts on one local installation. That is different from multi-user hosting: one app password grants access to all of those accounts, with no ownership boundaries between them.
 
 ## Edge cases and intentional exceptions
 
@@ -332,7 +337,7 @@ npm test
 
 `npm run build` is also an important verification step because it type-checks the React application, bundles the frontend, and compiles the Node backend.
 
-Focused classification tests cover probability selection, request contents, invalid responses, partial-failure retry, account/snapshot boundaries, and deletion during processing. There are no automated tests for OAuth, Gmail requests, retry timing, Gmail worker recovery, CSV output, Express routes, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
+Focused classification tests cover probability selection, request contents, invalid responses, partial-failure retry, account/snapshot boundaries, and deletion during processing. Focused login tests exercise the Express session guard, password failure/throttling, origin checks, cookie behavior, logout, expiry, and process-local sessions. OAuth tests cover state/session binding and expiry without Google requests. There are no automated tests for live Google token exchange, Gmail requests, retry timing, Gmail worker recovery, CSV output, or browser behavior. Changes in those areas currently require targeted manual verification with a configured Google project or purpose-built test fixtures.
 
 `legacy/code.gs` is retained as the behavior that motivated the app, but it is not imported, executed, or synchronized with the TypeScript implementation.
 

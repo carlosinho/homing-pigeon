@@ -3,7 +3,7 @@ import { google } from 'googleapis';
 import { config, googleConfigured } from './config.js';
 import { db, type AccountRecord } from './database.js';
 
-const oauthStates = new Map<string, number>();
+const oauthStates = new Map<string, { expiresAt: number; sessionId: string }>();
 const TEN_MINUTES = 10 * 60 * 1000;
 
 export function createOAuthClient(account?: AccountRecord) {
@@ -47,10 +47,13 @@ export function createOAuthClient(account?: AccountRecord) {
   return client;
 }
 
-export function createAuthorizationUrl(): string {
+export function createAuthorizationUrl(sessionId: string): string {
   const client = createOAuthClient();
   const state = randomBytes(24).toString('hex');
-  oauthStates.set(state, Date.now() + TEN_MINUTES);
+  for (const [key, value] of oauthStates) {
+    if (value.expiresAt <= Date.now()) oauthStates.delete(key);
+  }
+  oauthStates.set(state, { expiresAt: Date.now() + TEN_MINUTES, sessionId });
 
   return client.generateAuthUrl({
     access_type: 'offline',
@@ -60,10 +63,10 @@ export function createAuthorizationUrl(): string {
   });
 }
 
-export function consumeOAuthState(state: string): boolean {
-  const expiresAt = oauthStates.get(state);
+export function consumeOAuthState(state: string, sessionId: string): boolean {
+  const pending = oauthStates.get(state);
   oauthStates.delete(state);
-  return Boolean(expiresAt && expiresAt > Date.now());
+  return Boolean(pending && pending.expiresAt > Date.now() && pending.sessionId === sessionId);
 }
 
 export async function exchangeAuthorizationCode(code: string): Promise<number> {

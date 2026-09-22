@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSession } from '../session-context';
 import { ChevronDown } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import packageMetadata from '../../package.json';
@@ -12,6 +14,19 @@ const navigation = [
 ];
 
 export function Layout() {
+  const { logout } = useSession();
+  const [logoutError, setLogoutError] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await logout();
+    } catch (caught) {
+      setLogoutError(caught instanceof Error ? caught.message : 'Could not log out.');
+      setLoggingOut(false);
+    }
+  }
   const {
     accounts,
     activeAccount,
@@ -77,11 +92,15 @@ export function Layout() {
       </header>
 
       <main className="main-content">
+        {logoutError ? <div className="error-banner" role="alert">{logoutError}</div> : null}
         {error ? <div className="error-banner" role="alert">{error}</div> : null}
         <Outlet />
       </main>
 
       <footer className="app-footer">
+        <button className="text-button" disabled={loggingOut} onClick={() => void handleLogout()}>
+          {loggingOut ? 'Logging out…' : 'Log out'}
+        </button>
         <span className="app-footer-version value">
           v {packageMetadata.version}
         </span>

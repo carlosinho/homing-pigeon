@@ -34,7 +34,7 @@ The Messages screen can delete one locally stored message or all messages for th
 
 ## Privacy and security
 
-Homing Pigeon is local-only: it binds to `127.0.0.1`, has no login, and is unsafe for shared or remote hosting. Gmail metadata and plaintext OAuth tokens stay in `.data/mailroom.db`; keep `.env` and `.data/` private. Optional Jev classification sends sender addresses and subjects to TypeSafe.
+Homing Pigeon is local-only: it binds to `127.0.0.1` and requires a single password login. It remains unsupported for shared or remote hosting. Gmail metadata and plaintext OAuth tokens stay in `.data/mailroom.db`; keep `.env` and `.data/` private. Optional Jev classification sends sender addresses and subjects to TypeSafe.
 
 ## Main flows
 
@@ -120,6 +120,7 @@ Information moved to `GoogleOAuth.md`
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
+| `APP_PASSWORD` | Yes | none | Single app password, stored only on the backend. Startup fails if empty. Restart after changing it. |
 | `GOOGLE_CLIENT_ID` | Yes | none | OAuth client ID from Google Cloud. OAuth is reported as unconfigured without it. |
 | `GOOGLE_CLIENT_SECRET` | Yes | none | OAuth client secret from Google Cloud. OAuth is reported as unconfigured without it. |
 | `GOOGLE_REDIRECT_URI` | No | `http://localhost:3001/api/auth/google/callback` | OAuth callback URL. It must exactly match an authorized redirect URI in Google Cloud. |
@@ -136,10 +137,13 @@ The SQLite location is not configurable: it is `.data/mailroom.db` relative to t
 ```bash
 npm install
 cp .env.example .env
+# Edit .env and set APP_PASSWORD and your Google credentials.
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). `npm run dev` starts the Vite frontend and the watched TypeScript backend together. Vite proxies `/api` to `http://localhost:3001`.
+Before starting, set `APP_PASSWORD` in `.env` to a private password (at most 1,024 characters). There is no default password or username.
+
+Open [http://localhost:5173](http://localhost:5173) and log in. `npm run dev` starts the Vite frontend and the watched TypeScript backend together. Vite proxies `/api` to `http://localhost:3001`.
 
 The available npm commands are:
 
@@ -172,6 +176,14 @@ npm start
 Open [http://localhost:3001](http://localhost:3001). The Express process serves the compiled React application and API from the same loopback origin.
 
 If the port or hostname changes, update `PORT`, `APP_URL`, `GOOGLE_REDIRECT_URI`, and the authorized redirect URI in Google Cloud together.
+
+## Login
+
+The password unlocks all Gmail accounts on this installation. There are no app user accounts or registration. Keep `APP_PASSWORD` private: it is plaintext in `.env`, like the other local secrets, and is never sent to the frontend. To change or recover it, edit `.env` and restart the backend.
+
+Sessions expire eight hours after login and are lost whenever the backend restarts. **Log out** revokes the current session and clears the inventory from open tabs sharing that session. Logging out does not disconnect Gmail or stop background jobs. Five failed login attempts temporarily block login until the 15-minute attempt window ends.
+
+Use the hostname and port configured in `APP_URL` when opening the app; state-changing requests must come from that origin. In development, keep the default `http://localhost:5173`; for the built app, use `http://localhost:3001`. Login protects browser/API access, not files on disk, and does not make remote hosting supported.
 
 ## Local data and reset
 
@@ -214,13 +226,16 @@ See [ROADMAP.md](./ROADMAP.md) for shipped milestones, the development backlog, 
 
 ## HTTP API
 
-The React client uses these endpoints directly.
+The React client uses these endpoints directly. Except for health, session status, login, and logout, every API route requires a valid session cookie. State-changing requests require an `Origin` matching `APP_URL`.
 
 | Method | Route | Behavior |
 | --- | --- | --- |
+| `GET` | `/api/session` | Return authentication status and session expiry, without account data. |
+| `POST` | `/api/session/login` | Accept `{ "password": "..." }` and set an eight-hour HttpOnly session cookie. |
+| `POST` | `/api/session/logout` | Revoke the current session and clear its cookie. |
 | `GET` | `/api/health` | Return `{ "ok": true }`. |
 | `GET` | `/api/auth/status` | Return OAuth configuration status and all locally known accounts without tokens. |
-| `GET` | `/api/auth/google/start` | Create a 10-minute OAuth state value and return Google's authorization URL. |
+| `POST` | `/api/auth/google/start` | Create a 10-minute OAuth state value and return Google's authorization URL. |
 | `GET` | `/api/auth/google/callback` | Exchange Google's authorization code, upsert the account by email, and redirect to `/fetch`. |
 | `POST` | `/api/accounts/:accountId/disconnect` | Clear local OAuth tokens while retaining messages and jobs. |
 | `DELETE` | `/api/accounts/:accountId/messages` | Delete all locally stored messages for the account. Returns 409 while the account has a queued or running fetch. |

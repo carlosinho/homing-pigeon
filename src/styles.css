@@ -1395,3 +1395,36 @@ tbody tr:hover td.sticky-action {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- login ---------- */
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--page-x);
+}
+
+.login-panel {
+  width: min(100%, 380px);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--rule);
+  background: var(--ground-raised);
+}
+
+.login-logo { width: 64px; height: auto; }
+.login-panel h1 { font-size: 24px; font-stretch: 125%; }
+.login-panel > p { color: var(--ink-2); }
+.login-panel input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: var(--ground);
+}
+.login-panel button[type="submit"] {
+  padding: 10px 16px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--ground-raised);
+}

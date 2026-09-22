@@ -1,4 +1,5 @@
 import express from 'express';
+import { createSessionRouter } from './session.js';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +32,7 @@ function wakeClassificationWorker() {
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '32kb' }));
+app.use('/api', createSessionRouter(config.appPassword, config.appUrl));
 
 const idSchema = z.coerce.number().int().positive();
 const jobSchema = z.object({ query: z.string().trim().min(1).max(1_000) });
@@ -97,10 +99,6 @@ function deleteStoredMessages(
   })();
 }
 
-app.get('/api/health', (_request, response) => {
-  response.json({ ok: true });
-});
-
 app.get('/api/auth/status', (_request, response) => {
   const accounts = db
     .prepare(
@@ -114,15 +112,15 @@ app.get('/api/auth/status', (_request, response) => {
   response.json({ configured: googleConfigured, accounts });
 });
 
-app.get('/api/auth/google/start', (_request, response) => {
-  response.json({ url: createAuthorizationUrl() });
+app.post('/api/auth/google/start', (_request, response) => {
+  response.json({ url: createAuthorizationUrl(response.locals.sessionId) });
 });
 
 app.get('/api/auth/google/callback', async (request, response) => {
   const code = typeof request.query.code === 'string' ? request.query.code : '';
   const state = typeof request.query.state === 'string' ? request.query.state : '';
 
-  if (!code || !state || !consumeOAuthState(state)) {
+  if (!code || !state || !consumeOAuthState(state, response.locals.sessionId)) {
     response.redirect(`${config.appUrl}/fetch?authError=invalid_callback`);
     return;
   }

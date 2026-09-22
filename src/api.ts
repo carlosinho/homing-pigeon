@@ -10,6 +10,9 @@ import type {
   Sender,
 } from './types';
 
+export type SessionStatus = { authenticated: boolean; expiresAt: number | null };
+export const SESSION_EXPIRED_EVENT = 'mailroom:session-expired';
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...options,
@@ -20,6 +23,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
+    if (response.status === 401 && path !== '/api/session/login') {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
     const payload = (await response.json().catch(() => null)) as
       | { error?: string }
       | null;
@@ -44,6 +50,11 @@ export function queryString(
 }
 
 export const api = {
+  session: () => request<SessionStatus>('/api/session'),
+  login: (password: string) => request<SessionStatus>('/api/session/login', {
+    method: 'POST', body: JSON.stringify({ password }),
+  }),
+  logout: () => request<void>('/api/session/logout', { method: 'POST' }),
   eraseClassifications: () =>
     request<{ erasedCount: number }>('/api/classifications', { method: 'DELETE' }),
   classification: (accountId: number) =>
@@ -55,7 +66,7 @@ export const api = {
     }),
   authStatus: () =>
     request<{ configured: boolean; accounts: Account[] }>('/api/auth/status'),
-  authorizationUrl: () => request<{ url: string }>('/api/auth/google/start'),
+  authorizationUrl: () => request<{ url: string }>('/api/auth/google/start', { method: 'POST' }),
   disconnect: (accountId: number) =>
     request<void>(`/api/accounts/${accountId}/disconnect`, { method: 'POST' }),
   deleteMessages: (accountId: number) =>

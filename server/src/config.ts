@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { resolve } from 'node:path';
 
 export const config = {
+  appPassword: process.env.APP_PASSWORD || '',
   port: Number(process.env.PORT || 3001),
   appUrl: process.env.APP_URL || 'http://localhost:5173',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',

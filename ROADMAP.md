@@ -30,21 +30,27 @@
   - No sync with actual Gmail. This is just deleting from the app.
   - Simple confirmation UI: the trash button changes to "Sure?" and must be clicked again to delete.
 - [x] Email classification with Jev
-   - CLASSIFY beside More columns reveals actions to classify this page or all account messages, using sender and subject only and skipping existing categories.
-   - Categories: newsletter, marketing, dev update, travel, social media junk, purchases, other.
-   - Choose the category with the highest probability in Jev's response; no confidence threshold.
-   - Display category badges immediately left of the Gmail external-link button and include categories in message CSV exports.
-   - Editable category instructions and examples live in `server/src/classification-guidance.ts`.
+  - CLASSIFY beside More columns reveals actions to classify this page or all account messages, using sender and subject only and skipping existing categories.
+  - Categories: newsletter, marketing, dev update, travel, social media junk, purchases, other.
+  - Choose the category with the highest probability in Jev's response; no confidence threshold.
+  - Display category badges immediately left of the Gmail external-link button and include categories in message CSV exports.
+  - Editable category instructions and examples live in `server/src/classification-guidance.ts`.
 - [x] Add version numbering with one source of truth.
-- [ ] Add simple user login.
-  - This is a single-user app - no user accounts. Let's keep it that way.
-  - We can set the password as an .env value. Are there any downsides?
+- [x] Add simple user login.
+  - Single-user password from required `APP_PASSWORD` in `.env`; no app user accounts.
+  - Eight-hour in-memory sessions, invalidated on logout or restart; protected APIs and CSV exports.
+  - Origin checks, login throttling, and session-bound Gmail OAuth. Deployment remains local-only.
+  - The password remains plaintext in `.env`; login does not encrypt local data.
+- [ ] "Probable spam" suggestions
+  - Use Jev to mark emails that are likely spam.
+  - Implement so that it's added to the category classification implementation with Jev now
+  - Use same guidance file to edit specific example, help classifying email as spam
+  - Some initial hint could be that if email address is "suspicious" - ones that look like random sets of characters - commonly used for spam. For example, something like: df244h7j@gmail.com
+  - If Jev marks email as probably spam, put the ☠️ emoji next to it - same location as the email categories when classified by Jev in another step
+  - Bind it to the same ui - classify emails option.
 - [ ] Add privacy view
-   - Needed to record videos or make screenshots of the app's window without capturing email addresses in the open. This is purely for display purposes, meaning the parts of the emails should be obscured so that the whole email address is not identifiable. For example, we can redact every other character in the email. We can use the Redacted google font for that.
-   - This can be a toggle in the settings. Do we have a settings page?
-- [ ] Some panel with suggestions
-   - We can use it to show suggested actions based on the data set (emails) in the db. 
-   - We can start by listing "suspicious" email addresses - ones that look like random sets of characters - commonly used for spam. For example, something like: df244h7j@gmail.com
+  - Needed to record videos or make screenshots of the app's window without capturing email addresses in the open. This is purely for display purposes, meaning the parts of the emails should be obscured so that the whole email address is not identifiable. For example, we can redact every other character in the email. We can use the Redacted google font for that.
+  - This can be a toggle in the settings. Do we have a settings page?
 
 ### Backlog / future
 
@@ -65,13 +71,13 @@
 - New messages require individual `messages.get` calls; there is no batching or controlled concurrency.
 - SQLite offset pagination, substring `LIKE` filters, and on-demand sender/domain grouping will become slower on large inventories.
 - Sender and domain search treat `%` and `_` as SQL wildcards, unlike message column filters, which escape them.
-- OAuth tokens are plaintext in SQLite and the API has no login, request authorization, origin validation, or explicit CSRF protection; operation is intentionally loopback-only.
+- OAuth tokens are plaintext in SQLite and the app password is plaintext in `.env`; login protects API access, while operation remains intentionally loopback-only.
 - OAuth state is process-local, so restarting the backend invalidates an authorization flow already in progress.
 - Disconnecting an account does not stop an OAuth client already used by a running job; a later refresh may fail after tokens are cleared.
 - Startup uses `CREATE TABLE IF NOT EXISTS` and has no general migration runner; the activity-event target and message category columns have explicit compatibility upgrades.
 - Account-scoped read routes return empty results for unknown account IDs, and unmatched built-deployment GET requests may return the React application instead of JSON 404.
 - `REQUEST_DELAY_MS` is not checked for a finite, non-negative value.
-- Automated tests cover parsers, minimal domain-query behavior, and focused classification behavior; most API, worker, OAuth, CSV, database, and browser behavior needs manual verification.
+- Automated tests cover parsers, minimal domain-query behavior, focused classification behavior, login sessions, and OAuth-state binding; most API, worker, OAuth, CSV, database, and browser behavior needs manual verification.
 
 ## Decisions pending
 
