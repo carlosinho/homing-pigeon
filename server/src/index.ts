@@ -47,6 +47,7 @@ function messageResponseRow(row: Record<string, unknown>) {
   const { attachments_json: attachmentsJson, ...message } = row;
   return {
     ...message,
+    probable_spam: message.probable_spam == null ? null : Boolean(message.probable_spam),
     attachments: JSON.parse(String(attachmentsJson || '[]')) as unknown[],
   };
 }
@@ -267,7 +268,7 @@ app.delete('/api/classifications', (_request, response) => {
     response.status(409).json({ error: 'Wait for classification to finish in all accounts before erasing classifications.' });
     return;
   }
-  const result = db.prepare('UPDATE messages SET category = NULL WHERE category IS NOT NULL').run();
+  const result = db.prepare('UPDATE messages SET category = NULL, probable_spam = NULL WHERE category IS NOT NULL OR probable_spam IS NOT NULL').run();
   response.json({ erasedCount: result.changes });
 });
 
@@ -365,7 +366,7 @@ app.get('/api/accounts/:accountId/messages.csv', (request, response) => {
     'Content-Disposition',
     `attachment; filename="gmail-messages-${new Date().toISOString().slice(0, 10)}.csv"`,
   );
-  const csvColumns = [...messageColumns, 'attachments', 'category'] as const;
+  const csvColumns = [...messageColumns, 'attachments', 'category', 'probable_spam'] as const;
   response.write(`\ufeff${csvColumns.map(csvCell).join(',')}\r\n`);
   for (const row of rows) {
     const values = csvColumns.map((column) => {

@@ -113,6 +113,9 @@ const messageTableColumns = db.prepare('PRAGMA table_info(messages)').all() as A
 if (!messageTableColumns.some((column) => column.name === 'category')) {
   db.exec('ALTER TABLE messages ADD COLUMN category TEXT');
 }
+if (!messageTableColumns.some((column) => column.name === 'probable_spam')) {
+  db.exec('ALTER TABLE messages ADD COLUMN probable_spam INTEGER CHECK (probable_spam IN (0, 1))');
+}
 db.exec('CREATE INDEX IF NOT EXISTS idx_messages_unclassified ON messages(account_id, id) WHERE category IS NULL');
 const classificationJobColumns = db.prepare('PRAGMA table_info(classification_jobs)').all() as Array<{ name: string }>;
 if (!classificationJobColumns.some((column) => column.name === 'message_ids_json')) {

@@ -74,11 +74,11 @@ Classification UI is shown only when `TYPESAFE_API_KEY` is configured. Without i
 
 Set `TYPESAFE_API_KEY` in `.env`, restart the backend, and click **CLASSIFY** on the Messages screen. The revealed section offers **Classify this page** and **Classify all**, including rows hidden by filters. Both options skip messages that already have categories.
 
-Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with progress on the Messages screen.
+Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with progress on the Messages screen. The same Jev request independently assesses probable spam. A spam probability of at least 0.7 shows ☠️ beside the category.
 
-**Adjust the classifier:** edit [`server/src/classification-guidance.ts`](./server/src/classification-guidance.ts). It contains the shared instructions plus `covers`, `not_for`, and sender/subject examples for every category. Keep the category keys unchanged. Restart the backend after editing; for a built deployment, run `npm run build` before restarting. Changes affect future requests, not saved categories.
+**Adjust the classifier:** edit [`server/src/classification-guidance.ts`](./server/src/classification-guidance.ts). It contains the category instructions plus `covers`, `not_for`, and sender/subject examples for every category, as well as separate spam guidance and examples. Keep the category keys unchanged. Restart the backend after editing; for a built deployment, run `npm run build` before restarting. Changes affect future requests, not saved categories.
 
-**Start over:** the **Erase classifications** button - erases categories from **every message in every account**, regardless of the current page or filters. Messages and job history are retained. Erasure is blocked while any account has queued or running classification. You can then classify again with your adjusted instructions.
+**Start over:** the **Erase classifications** button - erases categories and spam assessments from **every message in every account**, regardless of the current page or filters. Messages and job history are retained. Erasure is blocked while any account has queued or running classification. You can then classify again with your adjusted instructions.
 
 ### 4. Rank senders and domains
 
@@ -88,7 +88,7 @@ The Domains screen derives the portion after `@` from each normalized sender ema
 
 ### 5. Export CSV
 
-The Messages, Senders, and Domains screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files include message size and attachment metadata. Sender CSV files include `sender_email`, `message_count`, and `total_size_bytes`; domain CSV files contain `sender_domain` and `message_count`.
+The Messages, Senders, and Domains screens export all rows matching the active account, filters, search, and sort order; exports are not limited to the visible page. Message CSV files include message size, attachment metadata, categories, and `probable_spam` (`1` for flagged, `0` for assessed but not flagged, blank for not assessed). Sender CSV files include `sender_email`, `message_count`, and `total_size_bytes`; domain CSV files contain `sender_domain` and `message_count`.
 
 CSV output includes a UTF-8 BOM, quotes every value, and prefixes cells beginning with `=`, `+`, `-`, or `@` to reduce spreadsheet formula-injection risk.
 
@@ -245,7 +245,7 @@ The React client uses these endpoints directly. Except for health, session statu
 | `POST` | `/api/accounts/:accountId/jobs` | Queue a fetch. JSON body: `{ "query": "in:inbox older:1y" }`. Queries must contain 1–1,000 characters after trimming. |
 | `GET` | `/api/accounts/:accountId/jobs` | Return recent fetch jobs and local-data activity for the account. |
 | `POST` | `/api/jobs/:jobId/retry` | Move a failed job back to `queued`. Returns 409 for a job not currently failed. |
-| `DELETE` | `/api/classifications` | Erase all message categories across all accounts. Returns 409 while any classification is queued/running. |
+| `DELETE` | `/api/classifications` | Erase all message categories and spam assessments across all accounts. Returns 409 while any classification is queued/running. |
 | `GET` | `/api/accounts/:accountId/classification` | Return configuration status, unclassified count, and latest classification job. |
 | `POST` | `/api/accounts/:accountId/classification` | Queue classification of unclassified account messages. Optional JSON `messageIds` limits the run to the displayed Gmail message IDs (1–100); omit it for all messages. Returns 409 if already active. |
 | `GET` | `/api/accounts/:accountId/messages` | Return a page of account messages. |

@@ -446,9 +446,9 @@ export function MessagesPage() {
               </button>
             </div>
             <p>
-              Only unclassified messages will be classified. Sends sender and subject to Jev.
+              Only unclassified messages will be categorized and checked for probable spam. Sends sender and subject to Jev.
               {' '}“Classify this page” uses the messages currently displayed; “Classify all” includes all messages in this account, even those hidden by filters.
-              {' '}“Erase classifications” clears categories for every message across all accounts; messages are kept.
+              {' '}“Erase classifications” clears categories and spam assessments for every message across all accounts; messages are kept.
             </p>
             {eraseClassificationsError ? <div className="error-banner" role="alert">{eraseClassificationsError}</div> : null}
             <p>{classificationStatus?.unclassifiedCount.toLocaleString()} unclassified in this account.</p>
@@ -496,7 +496,7 @@ export function MessagesPage() {
                     </button>
                   </th>
                 ))}
-                <th className={actionColumnClass}><span className="sr-only">{classificationEnabled ? 'Category and actions' : 'Actions'}</span></th>
+                <th className={actionColumnClass}><span className="sr-only">{classificationEnabled ? 'Category, probable spam, and actions' : 'Actions'}</span></th>
               </tr>
               {filtersOpen ? (
                 <tr className="filter-row">
@@ -555,6 +555,9 @@ export function MessagesPage() {
                         <span className="category-badge">{categoryLabels[message.category]}</span>
                       ) : (
                         <span className="category-unclassified" title="Not classified">—</span>
+                      ) : null}
+                      {classificationEnabled && message.probable_spam === true ? (
+                        <span role="img" aria-label="probably spam" title="probably spam">☠️</span>
                       ) : null}
                       <a
                         className="icon-button"

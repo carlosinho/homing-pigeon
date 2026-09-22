@@ -41,6 +41,7 @@ export type MessageAttachment = {
 };
 
 export type Message = {
+  probable_spam: boolean | null;
   category: 'newsletter' | 'marketing' | 'dev_update' | 'travel' | 'social_media' | 'purchases' | 'other' | null;
   sender_email: string;
   subject: string;

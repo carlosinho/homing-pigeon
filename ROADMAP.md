@@ -41,13 +41,12 @@
   - Eight-hour in-memory sessions, invalidated on logout or restart; protected APIs and CSV exports.
   - Origin checks, login throttling, and session-bound Gmail OAuth. Deployment remains local-only.
   - The password remains plaintext in `.env`; login does not encrypt local data.
-- [ ] "Probable spam" suggestions
-  - Use Jev to mark emails that are likely spam.
-  - Implement so that it's added to the category classification implementation with Jev now
-  - Use same guidance file to edit specific example, help classifying email as spam
-  - Some initial hint could be that if email address is "suspicious" - ones that look like random sets of characters - commonly used for spam. For example, something like: df244h7j@gmail.com
-  - If Jev marks email as probably spam, put the ☠️ emoji next to it - same location as the email categories when classified by Jev in another step
-  - Bind it to the same ui - classify emails option.
+- [x] "Probable spam" suggestions
+  - Assess spam independently in the same Jev request as category classification, using sender and subject only.
+  - Keep the existing Classify this page / Classify all workflow and skip already categorized messages, including legacy rows without a spam assessment.
+  - Editable spam guidance and examples share `server/src/classification-guidance.ts`; random-looking sender addresses are supporting evidence, not an automatic verdict.
+  - Show only ☠️ beside the category when spam probability is at least 0.7, with “probably spam” on hover.
+  - Include `probable_spam` in message CSV exports (1/0/blank); Erase classifications clears both categories and spam assessments.
 - [ ] Add privacy view
   - Needed to record videos or make screenshots of the app's window without capturing email addresses in the open. This is purely for display purposes, meaning the parts of the emails should be obscured so that the whole email address is not identifiable. For example, we can redact every other character in the email. We can use the Redacted google font for that.
   - This can be a toggle in the settings. Do we have a settings page?
@@ -74,7 +73,7 @@
 - OAuth tokens are plaintext in SQLite and the app password is plaintext in `.env`; login protects API access, while operation remains intentionally loopback-only.
 - OAuth state is process-local, so restarting the backend invalidates an authorization flow already in progress.
 - Disconnecting an account does not stop an OAuth client already used by a running job; a later refresh may fail after tokens are cleared.
-- Startup uses `CREATE TABLE IF NOT EXISTS` and has no general migration runner; the activity-event target and message category columns have explicit compatibility upgrades.
+- Startup uses `CREATE TABLE IF NOT EXISTS` and has no general migration runner; the activity-event target and message category and spam columns have explicit compatibility upgrades.
 - Account-scoped read routes return empty results for unknown account IDs, and unmatched built-deployment GET requests may return the React application instead of JSON 404.
 - `REQUEST_DELAY_MS` is not checked for a finite, non-negative value.
 - Automated tests cover parsers, minimal domain-query behavior, focused classification behavior, login sessions, and OAuth-state binding; most API, worker, OAuth, CSV, database, and browser behavior needs manual verification.
