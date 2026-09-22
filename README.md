@@ -10,6 +10,8 @@ Homing Pigeon is read-only. It does not archive, label, trash, delete, or unsubs
 
 <br clear="left" />
 
+[![CI](https://github.com/carlosinho/homing-pigeon/actions/workflows/ci.yml/badge.svg)](https://github.com/carlosinho/homing-pigeon/actions/workflows/ci.yml)
+
 ## What it does
 
 Homing Pigeon runs the same search syntax as the Gmail search box and stores one row for each matching Gmail message. The stored fields are:
@@ -29,6 +31,10 @@ The app requests headers, size estimates, and MIME metadata, but excludes messag
 The inventory is cumulative for each account. A completed fetch adds new messages to that account's existing inventory; the Messages and Senders screens are not limited to the results of one particular fetch.
 
 The Messages screen can delete one locally stored message or all messages for the selected account. The Senders and Domains screens can delete all local messages in a selected sender or domain group; Unknown sender and Unknown domain groups do not offer this action. Row deletions use an inline two-click confirmation. None of these actions change Gmail, connected accounts, or fetch history, and a later fetch can import the same messages again. Each successful action appears with its specific message, sender, domain, or full-inventory label alongside fetches in the Fetch screen's Activity list.
+
+## Privacy and security
+
+Homing Pigeon is local-only: it binds to `127.0.0.1`, has no login, and is unsafe for shared or remote hosting. Gmail metadata and plaintext OAuth tokens stay in `.data/mailroom.db`; keep `.env` and `.data/` private. Optional Jev classification sends sender addresses and subjects to TypeSafe.
 
 ## Main flows
 
@@ -66,7 +72,7 @@ The received-date filter is matched against a UTC `YYYY-MM-DD HH:MM:SS` represen
 
 Classification UI is shown only when `TYPESAFE_API_KEY` is configured. Without it, the CLASSIFY toggle, panel, and all category badges are hidden, including previously saved classifications. Saved categories remain in the database and become visible again when the key is restored. Restart the backend after changing `.env`.
 
-Set `TYPESAFE_API_KEY` in `.env`, restart the backend, and click **CLASSIFY** on the Messages screen. The revealed section offers **Classify this page** and **Classify all**, including rows hidden by filters. Both options skip messages that already have categories. It sends only sender email and subject to TypeSafe's Jev API.
+Set `TYPESAFE_API_KEY` in `.env`, restart the backend, and click **CLASSIFY** on the Messages screen. The revealed section offers **Classify this page** and **Classify all**, including rows hidden by filters. Both options skip messages that already have categories.
 
 Each message receives the category with the highest probability: Newsletter, Marketing, Dev update, Travel, Social media junk, Purchases, or Other. Classification runs in the background with progress on the Messages screen.
 
@@ -119,7 +125,7 @@ Information moved to `GoogleOAuth.md`
 | `GOOGLE_REDIRECT_URI` | No | `http://localhost:3001/api/auth/google/callback` | OAuth callback URL. It must exactly match an authorized redirect URI in Google Cloud. |
 | `APP_URL` | No | `http://localhost:5173` | Frontend URL used after the OAuth callback. Use the default for development and `http://localhost:3001` for a built local deployment. |
 | `PORT` | No | `3001` | Express port. The server always binds to `127.0.0.1`. The Vite development proxy is statically configured for port 3001, so changing this also requires changing `vite.config.ts`. |
-| `TYPESAFE_API_KEY` | Only for classification | none | Backend-only TypeSafe API key. Sender and subject are sent to Jev when classification runs. |
+| `TYPESAFE_API_KEY` | Only for classification | none | Backend-only TypeSafe API key. |
 | `TYPESAFE_MODEL` | No | `jev-latest` | Jev model used for classification. |
 | `REQUEST_DELAY_MS` | No | `300` | Minimum delay between Gmail API requests, shared by all accounts and jobs. Use a non-negative number. |
 
@@ -148,7 +154,7 @@ The available npm commands are:
 
 ## Build and run as a local deployment
 
-The implemented deployment target is one user running the application on the same computer as the browser. It is not prepared for public or shared hosting.
+The supported deployment is one user running the app on the same computer as the browser.
 
 Set the production-style frontend URL in `.env`:
 
@@ -165,13 +171,11 @@ npm start
 
 Open [http://localhost:3001](http://localhost:3001). The Express process serves the compiled React application and API from the same loopback origin.
 
-If the port or hostname changes, update `PORT`, `APP_URL`, `GOOGLE_REDIRECT_URI`, and the authorized redirect URI in Google Cloud together. Remote deployment is not supported by the current security model.
+If the port or hostname changes, update `PORT`, `APP_URL`, `GOOGLE_REDIRECT_URI`, and the authorized redirect URI in Google Cloud together.
 
 ## Local data and reset
 
-The backend creates `.data/mailroom.db`, enables SQLite WAL mode, and stores message metadata, fetch history, and OAuth tokens in that database. `.data/` and `.env` are ignored by Git. On POSIX systems, the app attempts to set the data directory to mode `0700` and the main database file to `0600`.
-
-OAuth tokens are stored as plaintext inside the locally protected database. Do not copy or share it.
+The backend creates `.data/mailroom.db`, enables SQLite WAL mode, and stores message metadata, fetch history, and OAuth tokens there. On POSIX systems, it attempts to set the data directory to mode `0700` and the database to `0600`.
 
 To reset Homing Pigeon completely, stop the backend and remove `.data/`. This removes local accounts, tokens, fetch history, and message inventory; it does not change Gmail. The Disconnect button only clears local tokens and does not revoke the grant in the Google account.
 
@@ -210,7 +214,7 @@ See [ROADMAP.md](./ROADMAP.md) for shipped milestones, the development backlog, 
 
 ## HTTP API
 
-The React client uses these endpoints directly. There is no separate API authentication layer because the server is loopback-only.
+The React client uses these endpoints directly.
 
 | Method | Route | Behavior |
 | --- | --- | --- |
