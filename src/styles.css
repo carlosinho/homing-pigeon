@@ -162,6 +162,8 @@ select:focus-visible {
 /* ---------- shell ---------- */
 
 .app-shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
@@ -281,6 +283,7 @@ select:focus-visible {
 }
 
 .main-content {
+  flex: 1;
   padding: 56px var(--page-x) 96px;
 }
 
@@ -288,6 +291,23 @@ select:focus-visible {
   max-width: 1240px;
   margin-right: auto;
   margin-left: auto;
+}
+
+.app-footer {
+  padding: 18px var(--page-x);
+  border-top: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-size: 0.72rem;
+}
+
+.app-footer-version {
+  display: block;
+  max-width: 1240px;
+  margin-right: auto;
+  margin-left: auto;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
 }
 
 /* ---------- page header ---------- */

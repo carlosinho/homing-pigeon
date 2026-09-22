@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import packageMetadata from '../../package.json';
 import homingPigeonLogo from '../assets/homing-pigeon-logo.png';
 import { useAccount } from '../account-context';
 
@@ -79,6 +80,12 @@ export function Layout() {
         {error ? <div className="error-banner" role="alert">{error}</div> : null}
         <Outlet />
       </main>
+
+      <footer className="app-footer">
+        <span className="app-footer-version value">
+          v {packageMetadata.version}
+        </span>
+      </footer>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 ## Roadmap
 
-### v0.10 — Working local POC
+### v0.1.0 — Working local POC
 
 - [x] Local React and Express application — Vite serves development; Express serves the built UI and loopback API.
 - [x] Google OAuth connection — Request read-only Gmail access and persist refreshed credentials in local SQLite.
@@ -20,7 +20,7 @@
 - [x] Local data protections — Bind to loopback, exclude local secrets/data from Git, use restrictive POSIX modes, and validate API inputs.
 - [x] Focused automated coverage — Test parsing helpers, domain grouping, and empty-domain message filtering with Vitest.
 
-### v0.20 — Actual MVP
+### v0.2.0 — Actual MVP
 
 - [x] Simple delete button next to each row in the Messages, Senders, Domains screens.
   - The delete in Messages just deletes that given message from the app's database.
@@ -35,11 +35,13 @@
    - Choose the category with the highest probability in Jev's response; no confidence threshold.
    - Display category badges immediately left of the Gmail external-link button and include categories in message CSV exports.
    - Editable category instructions and examples live in `server/src/classification-guidance.ts`.
+- [x] Add version numbering with one source of truth.
+- [ ] Add simple user login.
+  - This is a single-user app - no user accounts. Let's keep it that way.
+  - We can set the password as an .env value. Are there any downsides?
 - [ ] Add privacy view
    - Needed to record videos or make screenshots of the app's window without capturing email addresses in the open. This is purely for display purposes, meaning the parts of the emails should be obscured so that the whole email address is not identifiable. For example, we can redact every other character in the email. We can use the Redacted google font for that.
    - This can be a toggle in the settings. Do we have a settings page?
-- [ ] Add version numbering with one source of truth like in my other apps.
-- [ ] Add simple login like in OpenShelf.
 - [ ] Some panel with suggestions
    - We can use it to show suggested actions based on the data set (emails) in the db. 
    - We can start by listing "suspicious" email addresses - ones that look like random sets of characters - commonly used for spam. For example, something like: df244h7j@gmail.com
