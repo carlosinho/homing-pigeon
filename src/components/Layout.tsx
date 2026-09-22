@@ -6,6 +6,7 @@ import packageMetadata from '../../package.json';
 import homingPigeonLogo from '../assets/homing-pigeon-logo.png';
 import { useAccount } from '../account-context';
 import { usePrivacy } from '../privacy-context';
+import { privateAddressText } from './PrivateAddress';
 
 const navigation = [
   { to: '/fetch', label: 'Fetch' },
@@ -76,7 +77,8 @@ export function Layout() {
               >
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.email}{account.connected ? '' : ' (disconnected)'}
+                    {privacyEnabled ? privateAddressText(account.email) : account.email}
+                    {account.connected ? '' : ' (disconnected)'}
                   </option>
                 ))}
               </select>
@@ -108,7 +110,7 @@ export function Layout() {
           type="button"
           aria-pressed={privacyEnabled}
           onClick={togglePrivacy}
-          title="Redact sender addresses, message subjects, and domains in the main tables"
+          title="Redact mailbox and sender addresses, message subjects, and domains"
         >
           Privacy view: {privacyEnabled ? 'On' : 'Off'}
         </button>

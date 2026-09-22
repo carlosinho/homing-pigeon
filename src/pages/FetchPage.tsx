@@ -5,6 +5,7 @@ import { useAccount } from '../account-context';
 import { api } from '../api';
 import { EmptyAccount } from '../components/EmptyAccount';
 import { PageHeader } from '../components/PageHeader';
+import { PrivateAddress } from '../components/PrivateAddress';
 import type { ActivityEvent, FetchJob } from '../types';
 
 const queryExamples = [
@@ -182,7 +183,7 @@ export function FetchPage() {
             <div className="connection-summary">
               <div className="connection-mailbox">
                 <span className="plate">Mailbox</span>
-                <strong>{activeAccount.email}</strong>
+                <strong><PrivateAddress value={activeAccount.email} fallback="Unknown mailbox" /></strong>
               </div>
               <span className={`status ${activeAccount.connected ? 'connected' : 'disconnected'}`}>
                 {activeAccount.connected ? 'Connected' : 'Disconnected'}
